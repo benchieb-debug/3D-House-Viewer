@@ -1,0 +1,29 @@
+{
+  "coordinate_system": "right-handed, meters, origin = scan start point",
+  "markers": [
+    {
+      "entity_id": "light.wohnzimmer_deckenlicht",
+      "room": "Wohnzimmer",
+      "x": 3.0,
+      "y": 2.3,
+      "z": 1.0,
+      "label": "Deckenlicht"
+    },
+    {
+      "entity_id": "binary_sensor.haustuer",
+      "room": "Eingang",
+      "x": 0.1,
+      "y": 1.0,
+      "z": 0.1,
+      "label": "Türsensor"
+    },
+    {
+      "entity_id": "switch.kueche_kaffeemaschine",
+      "room": "Küche",
+      "x": 5.2,
+      "y": 1.0,
+      "z": 3.6,
+      "label": "Kaffeemaschine"
+    }
+  ]
+}

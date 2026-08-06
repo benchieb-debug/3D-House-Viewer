@@ -1,0 +1,86 @@
+solid testhouse
+facet normal 0 -1 0
+  outer loop
+    vertex 0 0 0
+    vertex 6 0 0
+    vertex 6 0 4
+  endloop
+endfacet
+facet normal 0 -1 0
+  outer loop
+    vertex 0 0 0
+    vertex 6 0 4
+    vertex 0 0 4
+  endloop
+endfacet
+facet normal 0 1 0
+  outer loop
+    vertex 0 2.5 0
+    vertex 6 2.5 4
+    vertex 6 2.5 0
+  endloop
+endfacet
+facet normal 0 1 0
+  outer loop
+    vertex 0 2.5 0
+    vertex 0 2.5 4
+    vertex 6 2.5 4
+  endloop
+endfacet
+facet normal 0 0 -1
+  outer loop
+    vertex 0 0 0
+    vertex 6 2.5 0
+    vertex 6 0 0
+  endloop
+endfacet
+facet normal 0 0 -1
+  outer loop
+    vertex 0 0 0
+    vertex 0 2.5 0
+    vertex 6 2.5 0
+  endloop
+endfacet
+facet normal 0 0 1
+  outer loop
+    vertex 0 0 4
+    vertex 6 0 4
+    vertex 6 2.5 4
+  endloop
+endfacet
+facet normal 0 0 1
+  outer loop
+    vertex 0 0 4
+    vertex 6 2.5 4
+    vertex 0 2.5 4
+  endloop
+endfacet
+facet normal -1 0 0
+  outer loop
+    vertex 0 0 0
+    vertex 0 0 4
+    vertex 0 2.5 4
+  endloop
+endfacet
+facet normal -1 0 0
+  outer loop
+    vertex 0 0 0
+    vertex 0 2.5 4
+    vertex 0 2.5 0
+  endloop
+endfacet
+facet normal 1 0 0
+  outer loop
+    vertex 6 0 0
+    vertex 6 2.5 0
+    vertex 6 2.5 4
+  endloop
+endfacet
+facet normal 1 0 0
+  outer loop
+    vertex 6 0 0
+    vertex 6 2.5 4
+    vertex 6 0 4
+  endloop
+endfacet
+endsolid testhouse

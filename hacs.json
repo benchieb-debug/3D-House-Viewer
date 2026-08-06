@@ -1,0 +1,6 @@
+{
+  "name": "Haus 3D Viewer",
+  "render_readme": true,
+  "domains": ["house3d_viewer"],
+  "homeassistant": "2024.7.0"
+}

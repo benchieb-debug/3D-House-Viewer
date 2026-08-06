@@ -1,0 +1,11 @@
+{
+  "domain": "house3d_viewer",
+  "name": "Haus 3D Viewer",
+  "version": "0.1.0",
+  "documentation": "https://github.com/benchieb/house3d-viewer",
+  "issue_tracker": "https://github.com/benchieb/house3d-viewer/issues",
+  "codeowners": ["@benchieb"],
+  "requirements": [],
+  "config_flow": false,
+  "iot_class": "local_push"
+}
