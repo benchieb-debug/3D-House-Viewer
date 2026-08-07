@@ -83,6 +83,14 @@ class House3DViewerPanel extends HTMLElement {
       #floors { position: absolute; top: 12px; right: 12px; z-index: 1; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 60%; }
       .floor-btn { font-family: var(--paper-font-body1_-_font-family, sans-serif); font-size: 13px; padding: 6px 14px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.4); color: var(--primary-text-color, #eee); cursor: pointer; }
       .floor-btn.active { background: var(--primary-color, #03a9f4); border-color: var(--primary-color, #03a9f4); color: var(--text-primary-color, #fff); font-weight: 500; }
+      #markerEdit { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2; background: rgba(20,20,20,0.92); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 12px 14px; display: none; flex-direction: column; gap: 8px; min-width: 220px; font-family: var(--paper-font-body1_-_font-family, sans-serif); color: var(--primary-text-color, #eee); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+      #markerEdit .me-title { font-size: 13px; font-weight: 600; opacity: 0.9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #markerEdit .me-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+      #markerEdit .me-row label { width: 14px; opacity: 0.75; }
+      #markerEdit .me-row input { flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.25); color: inherit; border-radius: 6px; padding: 4px 8px; font-size: 13px; min-width: 0; }
+      #markerEdit .me-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+      #markerEdit button { font-family: inherit; font-size: 13px; padding: 5px 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); color: inherit; cursor: pointer; }
+      #markerEdit .me-save { background: var(--primary-color, #03a9f4); border-color: var(--primary-color, #03a9f4); color: var(--text-primary-color, #fff); font-weight: 500; }
       canvas { display: block; touch-action: none; }
     `;
     const container = document.createElement("div");
@@ -106,8 +114,24 @@ class House3DViewerPanel extends HTMLElement {
     const floors = document.createElement("div");
     floors.id = "floors";
 
+    const markerEdit = document.createElement("div");
+    markerEdit.id = "markerEdit";
+    markerEdit.innerHTML = `
+      <div class="me-title"></div>
+      <div class="me-row"><label>X</label><input type="number" step="0.01" class="me-x"></div>
+      <div class="me-row"><label>Y</label><input type="number" step="0.01" class="me-y"></div>
+      <div class="me-row"><label>Z</label><input type="number" step="0.01" class="me-z"></div>
+      <div class="me-actions">
+        <button type="button" class="me-cancel">Abbrechen</button>
+        <button type="button" class="me-save">Speichern</button>
+      </div>
+    `;
+    markerEdit.querySelector(".me-cancel").addEventListener("click", () => this._closeMarkerEditor());
+    markerEdit.querySelector(".me-save").addEventListener("click", () => this._saveMarkerEditor());
+
     container.appendChild(topLeft);
     container.appendChild(floors);
+    container.appendChild(markerEdit);
 
     this.attachShadow({ mode: "open" });
     this.shadowRoot.appendChild(style);
@@ -116,6 +140,12 @@ class House3DViewerPanel extends HTMLElement {
     this._statusEl = status;
     this._floorsEl = floors;
     this._axesToggleEl = axesToggle;
+    this._markerEditEl = markerEdit;
+    this._markerEditTitleEl = markerEdit.querySelector(".me-title");
+    this._markerEditXEl = markerEdit.querySelector(".me-x");
+    this._markerEditYEl = markerEdit.querySelector(".me-y");
+    this._markerEditZEl = markerEdit.querySelector(".me-z");
+    this._editingMarkerIndex = null;
   }
 
   _setStatus(text) {
@@ -222,6 +252,7 @@ class House3DViewerPanel extends HTMLElement {
     if (floorId === this._currentFloorId) {
       return;
     }
+    this._closeMarkerEditor(); // Marker-Index gehört zur bisherigen Ebene, sonst inkonsistent
     this._currentFloorId = floorId;
     this._renderFloorSwitcher();
     this._loadFloorData(floorId);
@@ -269,10 +300,13 @@ class House3DViewerPanel extends HTMLElement {
   // Text-Geometrie ohne zusätzliche Font-Loader-Imports mitbringt.
   _buildAxesGroup(size) {
     const group = new THREE.Group();
+    // Die geladene STL-Geometrie nutzt (0,1,0) als vertikale Achse ("nach oben") — hier als "Z"
+    // beschriftet (statt "Y"), damit die Beschriftung mit dem Nutzer-Koordinatenverständnis
+    // übereinstimmt: Z zeigt nach oben, X/Y liegen in der horizontalen Ebene.
     const axisDefs = [
       { dir: new THREE.Vector3(1, 0, 0), color: 0xff3b30, label: "X" },
-      { dir: new THREE.Vector3(0, 1, 0), color: 0x34c759, label: "Y" },
-      { dir: new THREE.Vector3(0, 0, 1), color: 0x0a84ff, label: "Z" },
+      { dir: new THREE.Vector3(0, 0, 1), color: 0x34c759, label: "Y" },
+      { dir: new THREE.Vector3(0, 1, 0), color: 0x0a84ff, label: "Z" },
     ];
     for (const axis of axisDefs) {
       const points = [new THREE.Vector3(0, 0, 0), axis.dir.clone().multiplyScalar(size)];
@@ -467,10 +501,15 @@ class House3DViewerPanel extends HTMLElement {
     if (!hits.length) {
       return;
     }
-    const hit = this._markers.find((m) => m.mesh === hits[0].object);
-    if (hit) {
+    const index = this._markers.findIndex((m) => m.mesh === hits[0].object);
+    if (index === -1) {
+      return;
+    }
+    const hit = this._markers[index];
+    if (hit.entityId) {
       this._fireMoreInfo(hit.entityId);
     }
+    this._openMarkerEditor(hit, index);
   }
 
   _fireMoreInfo(entityId) {
@@ -480,6 +519,65 @@ class House3DViewerPanel extends HTMLElement {
     });
     event.detail = { entityId };
     this.dispatchEvent(event);
+  }
+
+  // Zeigt X/Y/Z des angeklickten Markers editierbar an; Speichern schreibt die neue Position
+  // dauerhaft über den Backend-Endpunkt zurück in die positions.json der aktuellen Ebene.
+  // WICHTIG: _buildAxesGroup() beschriftet Three.js' vertikale Achse (mesh.position.y) im Bild
+  // als "Z" und die horizontale (mesh.position.z) als "Y" (Nutzerwunsch: Z zeigt nach oben).
+  // Das Formular muss dieselbe Vertauschung anwenden, sonst zeigt das "Z"-Feld einen anderen
+  // Wert als die im Bild sichtbare Z-Achse. Die positions.json/PUT-Nutzlast bleibt davon
+  // unberührt — dort heißen die Felder weiterhin x/y/z wie in Three.js (mesh.position direkt).
+  _openMarkerEditor(marker, index) {
+    this._editingMarkerIndex = index;
+    const pos = marker.mesh.position;
+    this._markerEditTitleEl.textContent =
+      marker.label || marker.entityId || marker.room || `Marker ${index + 1}`;
+    this._markerEditXEl.value = pos.x.toFixed(3);
+    this._markerEditYEl.value = pos.z.toFixed(3); // "Y"-Feld ↔ Three.js Z (horizontal)
+    this._markerEditZEl.value = pos.y.toFixed(3); // "Z"-Feld ↔ Three.js Y (vertikal/oben)
+    this._markerEditEl.style.display = "flex";
+  }
+
+  _closeMarkerEditor() {
+    this._markerEditEl.style.display = "none";
+    this._editingMarkerIndex = null;
+  }
+
+  async _saveMarkerEditor() {
+    if (this._editingMarkerIndex === null) {
+      return;
+    }
+    const x = parseFloat(this._markerEditXEl.value);
+    // Rückvertauschung passend zu _openMarkerEditor(): "Y"-Feld → Three.js Z, "Z"-Feld → Three.js Y.
+    const z = parseFloat(this._markerEditYEl.value);
+    const y = parseFloat(this._markerEditZEl.value);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+      return;
+    }
+    const apiBase = this._panelConfig.api_base;
+    const index = this._editingMarkerIndex;
+
+    try {
+      const resp = await this._hass.fetchWithAuth(
+        `${apiBase}/floors/${this._currentFloorId}/markers/${index}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ x, y, z }),
+        }
+      );
+      if (!resp.ok) {
+        throw new Error(`marker update HTTP ${resp.status}`);
+      }
+      const marker = this._markers[index];
+      if (marker) {
+        marker.mesh.position.set(x, y, z);
+      }
+      this._closeMarkerEditor();
+    } catch (err) {
+      console.error("[house3d-viewer] Marker-Update fehlgeschlagen:", err);
+    }
   }
 }
 
