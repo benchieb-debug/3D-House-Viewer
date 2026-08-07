@@ -107,8 +107,8 @@ class House3DModelView(HomeAssistantView):
         self._hass = hass
         self._floors = floors
 
-    async def get(self, request: web.Request) -> web.Response:
-        floor = self._floors.get(request.match_info["floor_id"])
+    async def get(self, request: web.Request, floor_id: str) -> web.Response:
+        floor = self._floors.get(floor_id)
         if floor is None:
             return web.Response(status=404)
         try:
@@ -142,8 +142,8 @@ class House3DPositionsView(HomeAssistantView):
         self._floors = floors
         self._state_colors = state_colors
 
-    async def get(self, request: web.Request) -> web.Response:
-        floor = self._floors.get(request.match_info["floor_id"])
+    async def get(self, request: web.Request, floor_id: str) -> web.Response:
+        floor = self._floors.get(floor_id)
         if floor is None:
             return web.Response(status=404)
         try:
