@@ -13,6 +13,7 @@ from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 
 from .const import (
+    API_FLOOR_MARKER_PATH,
     API_FLOOR_MODEL_PATH,
     API_FLOOR_POSITIONS_PATH,
     API_FLOORS_LIST_PATH,
@@ -166,6 +167,67 @@ class House3DPositionsView(HomeAssistantView):
             return json.load(handle)
 
 
+class House3DMarkerUpdateView(HomeAssistantView):
+    """Persists an edited marker's x/y/z back into positions.json."""
+
+    url = API_FLOOR_MARKER_PATH
+    name = f"api:{DOMAIN}:floor_marker_update"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant, floors: dict[str, dict]) -> None:
+        self._hass = hass
+        self._floors = floors
+
+    async def put(
+        self, request: web.Request, floor_id: str, marker_index: str
+    ) -> web.Response:
+        floor = self._floors.get(floor_id)
+        if floor is None:
+            return web.Response(status=404)
+        try:
+            index = int(marker_index)
+        except ValueError:
+            return web.Response(status=400, text="marker_index muss eine Zahl sein")
+
+        try:
+            body = await request.json()
+            x = float(body["x"])
+            y = float(body["y"])
+            z = float(body["z"])
+        except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+            return web.Response(status=400, text="x/y/z (Zahlen) erforderlich")
+
+        try:
+            updated = await self._hass.async_add_executor_job(
+                self._update_marker, floor[CONF_FLOOR_POSITIONS_PATH], index, x, y, z
+            )
+        except IndexError:
+            return web.Response(status=404, text="marker_index außerhalb des Bereichs")
+        except (OSError, json.JSONDecodeError) as err:
+            _LOGGER.error(
+                "Could not update positions file %s: %s",
+                floor[CONF_FLOOR_POSITIONS_PATH],
+                err,
+            )
+            return web.Response(status=500)
+
+        return web.json_response(updated)
+
+    @staticmethod
+    def _update_marker(path: str, index: int, x: float, y: float, z: float) -> dict:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        markers = data.get("markers", [])
+        if not 0 <= index < len(markers):
+            raise IndexError(f"marker index {index} out of range")
+        markers[index]["x"] = x
+        markers[index]["y"] = y
+        markers[index]["z"] = z
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(data, handle, indent=2, sort_keys=True, ensure_ascii=False)
+        return markers[index]
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Haus 3D Viewer integration from YAML."""
     conf = config[DOMAIN]
@@ -180,6 +242,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.http.register_view(
         House3DPositionsView(hass, floors, conf[CONF_STATE_COLORS])
     )
+    hass.http.register_view(House3DMarkerUpdateView(hass, floors))
 
     await async_register_panel(hass)
 
