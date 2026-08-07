@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import (
     API_FLOOR_MARKER_PATH,
+    API_FLOOR_MARKERS_PATH,
     API_FLOOR_MODEL_PATH,
     API_FLOOR_POSITIONS_PATH,
     API_FLOORS_LIST_PATH,
@@ -228,6 +229,76 @@ class House3DMarkerUpdateView(HomeAssistantView):
         return markers[index]
 
 
+class House3DMarkerCreateView(HomeAssistantView):
+    """Appends a new marker to positions.json (the "+ Punkt" button in the panel)."""
+
+    url = API_FLOOR_MARKERS_PATH
+    name = f"api:{DOMAIN}:floor_marker_create"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant, floors: dict[str, dict]) -> None:
+        self._hass = hass
+        self._floors = floors
+
+    async def post(self, request: web.Request, floor_id: str) -> web.Response:
+        floor = self._floors.get(floor_id)
+        if floor is None:
+            return web.Response(status=404)
+
+        try:
+            body = await request.json()
+            x = float(body["x"])
+            y = float(body["y"])
+            z = float(body["z"])
+        except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+            return web.Response(status=400, text="x/y/z (Zahlen) erforderlich")
+        entity_id = str(body.get("entity_id", ""))
+        room = str(body.get("room", ""))
+        label = str(body.get("label", ""))
+
+        try:
+            created = await self._hass.async_add_executor_job(
+                self._append_marker,
+                floor[CONF_FLOOR_POSITIONS_PATH],
+                entity_id,
+                room,
+                label,
+                x,
+                y,
+                z,
+            )
+        except (OSError, json.JSONDecodeError) as err:
+            _LOGGER.error(
+                "Could not append to positions file %s: %s",
+                floor[CONF_FLOOR_POSITIONS_PATH],
+                err,
+            )
+            return web.Response(status=500)
+
+        return web.json_response(created)
+
+    @staticmethod
+    def _append_marker(
+        path: str, entity_id: str, room: str, label: str, x: float, y: float, z: float
+    ) -> dict:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        markers = data.setdefault("markers", [])
+        new_marker = {
+            "entity_id": entity_id,
+            "room": room,
+            "label": label,
+            "x": x,
+            "y": y,
+            "z": z,
+        }
+        markers.append(new_marker)
+        index = len(markers) - 1
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(data, handle, indent=2, sort_keys=True, ensure_ascii=False)
+        return {"index": index, **new_marker}
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Haus 3D Viewer integration from YAML."""
     conf = config[DOMAIN]
@@ -243,6 +314,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         House3DPositionsView(hass, floors, conf[CONF_STATE_COLORS])
     )
     hass.http.register_view(House3DMarkerUpdateView(hass, floors))
+    hass.http.register_view(House3DMarkerCreateView(hass, floors))
 
     await async_register_panel(hass)
 

@@ -28,6 +28,7 @@ class House3DViewerPanel extends HTMLElement {
     this._houseMesh = null;
     this._axesGroup = null;
     this._axesVisible = false;
+    this._placingMode = false; // "Neuer Punkt": nächster Klick auf das Modell legt einen Marker an
     this._loadToken = 0; // guards against a slow floor switch overwriting a newer one
     this._onResize = this._onResize.bind(this);
     this._onClick = this._onClick.bind(this);
@@ -87,6 +88,7 @@ class House3DViewerPanel extends HTMLElement {
       #markerEdit .me-title { font-size: 13px; font-weight: 600; opacity: 0.9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       #markerEdit .me-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
       #markerEdit .me-row label { width: 14px; opacity: 0.75; }
+      #markerEdit .me-row.me-text label { width: auto; }
       #markerEdit .me-row input { flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.25); color: inherit; border-radius: 6px; padding: 4px 8px; font-size: 13px; min-width: 0; }
       #markerEdit .me-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
       #markerEdit button { font-family: inherit; font-size: 13px; padding: 5px 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); color: inherit; cursor: pointer; }
@@ -108,8 +110,14 @@ class House3DViewerPanel extends HTMLElement {
     axesToggle.textContent = "Achsen";
     axesToggle.addEventListener("click", () => this._toggleAxes());
 
+    const addMarkerToggle = document.createElement("button");
+    addMarkerToggle.className = "floor-btn";
+    addMarkerToggle.textContent = "+ Punkt";
+    addMarkerToggle.addEventListener("click", () => this._togglePlacingMode());
+
     topLeft.appendChild(status);
     topLeft.appendChild(axesToggle);
+    topLeft.appendChild(addMarkerToggle);
 
     const floors = document.createElement("div");
     floors.id = "floors";
@@ -118,6 +126,9 @@ class House3DViewerPanel extends HTMLElement {
     markerEdit.id = "markerEdit";
     markerEdit.innerHTML = `
       <div class="me-title"></div>
+      <div class="me-row me-text me-entity"><label>Entity</label><input type="text" class="me-entity-id" placeholder="light.wohnzimmer" autocapitalize="off" autocorrect="off"></div>
+      <div class="me-row me-text me-room-row"><label>Raum</label><input type="text" class="me-room"></div>
+      <div class="me-row me-text me-label-row"><label>Name</label><input type="text" class="me-label"></div>
       <div class="me-row"><label>X</label><input type="number" step="0.01" class="me-x"></div>
       <div class="me-row"><label>Y</label><input type="number" step="0.01" class="me-y"></div>
       <div class="me-row"><label>Z</label><input type="number" step="0.01" class="me-z"></div>
@@ -140,8 +151,15 @@ class House3DViewerPanel extends HTMLElement {
     this._statusEl = status;
     this._floorsEl = floors;
     this._axesToggleEl = axesToggle;
+    this._addMarkerToggleEl = addMarkerToggle;
     this._markerEditEl = markerEdit;
     this._markerEditTitleEl = markerEdit.querySelector(".me-title");
+    this._markerEditEntityRow = markerEdit.querySelector(".me-entity");
+    this._markerEditRoomRow = markerEdit.querySelector(".me-room-row");
+    this._markerEditLabelRow = markerEdit.querySelector(".me-label-row");
+    this._markerEditEntityEl = markerEdit.querySelector(".me-entity-id");
+    this._markerEditRoomEl = markerEdit.querySelector(".me-room");
+    this._markerEditLabelEl = markerEdit.querySelector(".me-label");
     this._markerEditXEl = markerEdit.querySelector(".me-x");
     this._markerEditYEl = markerEdit.querySelector(".me-y");
     this._markerEditZEl = markerEdit.querySelector(".me-z");
@@ -295,6 +313,14 @@ class House3DViewerPanel extends HTMLElement {
     }
   }
 
+  // "+ Punkt": aktiviert den Platzierungs-Modus. Der nächste Klick auf das Hausmodell (statt auf
+  // einen bestehenden Marker) öffnet das Formular für einen neuen Marker an dieser Position.
+  _togglePlacingMode() {
+    this._placingMode = !this._placingMode;
+    this._addMarkerToggleEl.classList.toggle("active", this._placingMode);
+    this._setStatus(this._placingMode ? "Tippe auf das Modell, um einen Punkt zu setzen" : null);
+  }
+
   // Farbige Achsenlinien vom Ursprung (Modellmittelpunkt nach geometry.center()) mit
   // X/Y/Z-Beschriftung an den Enden — als Canvas-Sprites, da Three.js keine eingebaute
   // Text-Geometrie ohne zusätzliche Font-Loader-Imports mitbringt.
@@ -442,23 +468,30 @@ class House3DViewerPanel extends HTMLElement {
   }
 
   _buildMarkers(markers) {
-    const geometry = new THREE.SphereGeometry(0.08, 16, 16);
-
     for (const marker of markers) {
-      const material = new THREE.MeshStandardMaterial({ color: FALLBACK_COLOR });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(marker.x, marker.y, marker.z);
-      mesh.userData.entityId = marker.entity_id;
-      this._scene.add(mesh);
-      this._markers.push({
-        mesh,
-        entityId: marker.entity_id,
-        room: marker.room,
-        label: marker.label,
-      });
+      this._addMarkerMesh(marker);
     }
-
     this._updateMarkerColors();
+  }
+
+  // Legt eine Marker-Kugel für ein {entity_id, room, label, x, y, z}-Objekt an und trägt sie in
+  // this._markers ein — gemeinsam genutzt beim initialen Laden einer Ebene und beim Anlegen eines
+  // neuen Punkts über "+ Punkt".
+  _addMarkerMesh(marker) {
+    const geometry = new THREE.SphereGeometry(0.08, 16, 16);
+    const material = new THREE.MeshStandardMaterial({ color: FALLBACK_COLOR });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(marker.x, marker.y, marker.z);
+    mesh.userData.entityId = marker.entity_id;
+    this._scene.add(mesh);
+    const entry = {
+      mesh,
+      entityId: marker.entity_id,
+      room: marker.room,
+      label: marker.label,
+    };
+    this._markers.push(entry);
+    return entry;
   }
 
   _colorForState(state) {
@@ -488,14 +521,27 @@ class House3DViewerPanel extends HTMLElement {
   }
 
   _onClick(event) {
-    if (!this._markers.length) {
-      return;
-    }
     const rect = this._renderer.domElement.getBoundingClientRect();
     this._pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this._pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
     this._raycaster.setFromCamera(this._pointer, this._camera);
+
+    if (this._placingMode) {
+      if (!this._houseMesh) {
+        return;
+      }
+      const hits = this._raycaster.intersectObject(this._houseMesh, false);
+      if (!hits.length) {
+        return;
+      }
+      this._togglePlacingMode(); // Modus nach einer Platzierung wieder verlassen
+      this._openMarkerCreator(hits[0].point);
+      return;
+    }
+
+    if (!this._markers.length) {
+      return;
+    }
     const meshes = this._markers.map((m) => m.mesh);
     const hits = this._raycaster.intersectObjects(meshes, false);
     if (!hits.length) {
@@ -530,34 +576,74 @@ class House3DViewerPanel extends HTMLElement {
   // unberührt — dort heißen die Felder weiterhin x/y/z wie in Three.js (mesh.position direkt).
   _openMarkerEditor(marker, index) {
     this._editingMarkerIndex = index;
+    this._creatingAtPoint = null;
+    this._setEntityRowsVisible(false); // Bestehende Marker: nur Position bearbeiten, wie gewünscht
     const pos = marker.mesh.position;
     this._markerEditTitleEl.textContent =
       marker.label || marker.entityId || marker.room || `Marker ${index + 1}`;
-    this._markerEditXEl.value = pos.x.toFixed(3);
-    this._markerEditYEl.value = pos.z.toFixed(3); // "Y"-Feld ↔ Three.js Z (horizontal)
-    this._markerEditZEl.value = pos.y.toFixed(3); // "Z"-Feld ↔ Three.js Y (vertikal/oben)
+    this._setMarkerEditFields(pos.x, pos.y, pos.z);
     this._markerEditEl.style.display = "flex";
+  }
+
+  // "+ Punkt": Formular für einen neuen Marker an der angeklickten Stelle, inkl. Entity-ID/Raum/
+  // Bezeichnung — X/Y/Z sind vom Klickpunkt vorausgefüllt, aber vor dem Speichern noch änderbar.
+  _openMarkerCreator(point) {
+    this._editingMarkerIndex = null;
+    this._creatingAtPoint = point;
+    this._setEntityRowsVisible(true);
+    this._markerEditTitleEl.textContent = "Neuer Punkt";
+    this._markerEditEntityEl.value = "";
+    this._markerEditRoomEl.value = "";
+    this._markerEditLabelEl.value = "";
+    this._setMarkerEditFields(point.x, point.y, point.z);
+    this._markerEditEl.style.display = "flex";
+  }
+
+  _setEntityRowsVisible(visible) {
+    const display = visible ? "flex" : "none";
+    this._markerEditEntityRow.style.display = display;
+    this._markerEditRoomRow.style.display = display;
+    this._markerEditLabelRow.style.display = display;
+  }
+
+  // WICHTIG: _buildAxesGroup() beschriftet Three.js' vertikale Achse (mesh.position.y) im Bild
+  // als "Z" und die horizontale (mesh.position.z) als "Y" (Nutzerwunsch: Z zeigt nach oben).
+  // Das Formular muss dieselbe Vertauschung anwenden, sonst zeigt das "Z"-Feld einen anderen Wert
+  // als die im Bild sichtbare Z-Achse. positions.json/die API-Nutzlast bleiben davon unberührt —
+  // dort heißen die Felder weiterhin x/y/z wie in Three.js (mesh.position direkt).
+  _setMarkerEditFields(x, y, z) {
+    this._markerEditXEl.value = x.toFixed(3);
+    this._markerEditYEl.value = z.toFixed(3); // "Y"-Feld ↔ Three.js Z (horizontal)
+    this._markerEditZEl.value = y.toFixed(3); // "Z"-Feld ↔ Three.js Y (vertikal/oben)
   }
 
   _closeMarkerEditor() {
     this._markerEditEl.style.display = "none";
     this._editingMarkerIndex = null;
+    this._creatingAtPoint = null;
   }
 
   async _saveMarkerEditor() {
-    if (this._editingMarkerIndex === null) {
+    if (this._editingMarkerIndex === null && !this._creatingAtPoint) {
       return;
     }
     const x = parseFloat(this._markerEditXEl.value);
-    // Rückvertauschung passend zu _openMarkerEditor(): "Y"-Feld → Three.js Z, "Z"-Feld → Three.js Y.
+    // Rückvertauschung passend zu _setMarkerEditFields(): "Y"-Feld → Three.js Z, "Z"-Feld → Three.js Y.
     const z = parseFloat(this._markerEditYEl.value);
     const y = parseFloat(this._markerEditZEl.value);
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
       return;
     }
-    const apiBase = this._panelConfig.api_base;
-    const index = this._editingMarkerIndex;
 
+    if (this._creatingAtPoint) {
+      await this._createMarker(x, y, z);
+    } else {
+      await this._updateMarker(this._editingMarkerIndex, x, y, z);
+    }
+  }
+
+  async _updateMarker(index, x, y, z) {
+    const apiBase = this._panelConfig.api_base;
     try {
       const resp = await this._hass.fetchWithAuth(
         `${apiBase}/floors/${this._currentFloorId}/markers/${index}`,
@@ -577,6 +663,28 @@ class House3DViewerPanel extends HTMLElement {
       this._closeMarkerEditor();
     } catch (err) {
       console.error("[house3d-viewer] Marker-Update fehlgeschlagen:", err);
+    }
+  }
+
+  async _createMarker(x, y, z) {
+    const apiBase = this._panelConfig.api_base;
+    const entity_id = this._markerEditEntityEl.value.trim();
+    const room = this._markerEditRoomEl.value.trim();
+    const label = this._markerEditLabelEl.value.trim();
+    try {
+      const resp = await this._hass.fetchWithAuth(`${apiBase}/floors/${this._currentFloorId}/markers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entity_id, room, label, x, y, z }),
+      });
+      if (!resp.ok) {
+        throw new Error(`marker create HTTP ${resp.status}`);
+      }
+      this._addMarkerMesh({ entity_id, room, label, x, y, z });
+      this._updateMarkerColors();
+      this._closeMarkerEditor();
+    } catch (err) {
+      console.error("[house3d-viewer] Marker-Erstellung fehlgeschlagen:", err);
     }
   }
 }
