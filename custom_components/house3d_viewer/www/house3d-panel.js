@@ -26,6 +26,8 @@ class House3DViewerPanel extends HTMLElement {
     this._floors = []; // [{ id, name }]
     this._currentFloorId = null;
     this._houseMesh = null;
+    this._axesGroup = null;
+    this._axesVisible = false;
     this._loadToken = 0; // guards against a slow floor switch overwriting a newer one
     this._onResize = this._onResize.bind(this);
     this._onClick = this._onClick.bind(this);
@@ -76,7 +78,8 @@ class House3DViewerPanel extends HTMLElement {
     style.textContent = `
       :host { display: block; position: relative; height: 100%; width: 100%; }
       #container { position: absolute; inset: 0; overflow: hidden; background: var(--primary-background-color, #111); }
-      #status { position: absolute; top: 12px; left: 12px; z-index: 1; font-family: var(--paper-font-body1_-_font-family, sans-serif); color: var(--primary-text-color, #eee); background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px; font-size: 13px; }
+      #topLeft { position: absolute; top: 12px; left: 12px; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+      #status { font-family: var(--paper-font-body1_-_font-family, sans-serif); color: var(--primary-text-color, #eee); background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px; font-size: 13px; }
       #floors { position: absolute; top: 12px; right: 12px; z-index: 1; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 60%; }
       .floor-btn { font-family: var(--paper-font-body1_-_font-family, sans-serif); font-size: 13px; padding: 6px 14px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.4); color: var(--primary-text-color, #eee); cursor: pointer; }
       .floor-btn.active { background: var(--primary-color, #03a9f4); border-color: var(--primary-color, #03a9f4); color: var(--text-primary-color, #fff); font-weight: 500; }
@@ -85,14 +88,25 @@ class House3DViewerPanel extends HTMLElement {
     const container = document.createElement("div");
     container.id = "container";
 
+    const topLeft = document.createElement("div");
+    topLeft.id = "topLeft";
+
     const status = document.createElement("div");
     status.id = "status";
     status.textContent = "Lade Ebenen…";
 
+    const axesToggle = document.createElement("button");
+    axesToggle.className = "floor-btn";
+    axesToggle.textContent = "Achsen";
+    axesToggle.addEventListener("click", () => this._toggleAxes());
+
+    topLeft.appendChild(status);
+    topLeft.appendChild(axesToggle);
+
     const floors = document.createElement("div");
     floors.id = "floors";
 
-    container.appendChild(status);
+    container.appendChild(topLeft);
     container.appendChild(floors);
 
     this.attachShadow({ mode: "open" });
@@ -101,6 +115,7 @@ class House3DViewerPanel extends HTMLElement {
     this._container = container;
     this._statusEl = status;
     this._floorsEl = floors;
+    this._axesToggleEl = axesToggle;
   }
 
   _setStatus(text) {
@@ -223,6 +238,72 @@ class House3DViewerPanel extends HTMLElement {
       this._scene.remove(marker.mesh);
     }
     this._markers = [];
+    this._removeAxesGroup();
+  }
+
+  _removeAxesGroup() {
+    if (!this._axesGroup) {
+      return;
+    }
+    this._scene.remove(this._axesGroup);
+    this._axesGroup.traverse((obj) => {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) {
+        if (obj.material.map) obj.material.map.dispose();
+        obj.material.dispose();
+      }
+    });
+    this._axesGroup = null;
+  }
+
+  _toggleAxes() {
+    this._axesVisible = !this._axesVisible;
+    this._axesToggleEl.classList.toggle("active", this._axesVisible);
+    if (this._axesGroup) {
+      this._axesGroup.visible = this._axesVisible;
+    }
+  }
+
+  // Farbige Achsenlinien vom Ursprung (Modellmittelpunkt nach geometry.center()) mit
+  // X/Y/Z-Beschriftung an den Enden — als Canvas-Sprites, da Three.js keine eingebaute
+  // Text-Geometrie ohne zusätzliche Font-Loader-Imports mitbringt.
+  _buildAxesGroup(size) {
+    const group = new THREE.Group();
+    const axisDefs = [
+      { dir: new THREE.Vector3(1, 0, 0), color: 0xff3b30, label: "X" },
+      { dir: new THREE.Vector3(0, 1, 0), color: 0x34c759, label: "Y" },
+      { dir: new THREE.Vector3(0, 0, 1), color: 0x0a84ff, label: "Z" },
+    ];
+    for (const axis of axisDefs) {
+      const points = [new THREE.Vector3(0, 0, 0), axis.dir.clone().multiplyScalar(size)];
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const material = new THREE.LineBasicMaterial({ color: axis.color });
+      group.add(new THREE.Line(geometry, material));
+
+      const sprite = this._makeAxisLabelSprite(axis.label, axis.color, size * 0.18);
+      sprite.position.copy(axis.dir.clone().multiplyScalar(size * 1.12));
+      group.add(sprite);
+    }
+    group.visible = this._axesVisible;
+    return group;
+  }
+
+  _makeAxisLabelSprite(text, color, scale) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
+    ctx.font = "bold 46px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, 32, 34);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true });
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(scale, scale, 1);
+    return sprite;
   }
 
   async _loadFloorData(floorId) {
@@ -291,6 +372,12 @@ class House3DViewerPanel extends HTMLElement {
         mesh.add(lines);
 
         this._frameCameraOn(geometry);
+
+        this._removeAxesGroup();
+        const radius = geometry.boundingSphere ? geometry.boundingSphere.radius : 1;
+        this._axesGroup = this._buildAxesGroup(Math.max(radius, 1) * 0.9);
+        this._scene.add(this._axesGroup);
+
         this._setStatus(null);
       },
       undefined,
