@@ -5,8 +5,7 @@ from homeassistant.components import panel_custom
 from homeassistant.core import HomeAssistant
 
 from .const import (
-    API_MODEL_PATH,
-    API_POSITIONS_PATH,
+    API_BASE_PATH,
     PANEL_ICON,
     PANEL_JS_FILENAME,
     PANEL_TITLE,
@@ -28,7 +27,6 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         embed_iframe=False,
         require_admin=False,
         config={
-            "model_url": API_MODEL_PATH,
-            "positions_url": API_POSITIONS_PATH,
+            "api_base": API_BASE_PATH,
         },
     )

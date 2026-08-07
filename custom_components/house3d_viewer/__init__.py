@@ -1,8 +1,9 @@
-"""Haus 3D Viewer: shows a scanned STL house model with live entity markers."""
+"""Haus 3D Viewer: shows scanned STL floor models with live entity markers."""
 from __future__ import annotations
 
 import json
 import logging
+import re
 
 import voluptuous as vol
 from aiohttp import web
@@ -12,11 +13,15 @@ from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 
 from .const import (
-    API_MODEL_PATH,
-    API_POSITIONS_PATH,
-    CONF_POSITIONS_PATH,
+    API_FLOOR_MODEL_PATH,
+    API_FLOOR_POSITIONS_PATH,
+    API_FLOORS_LIST_PATH,
+    CONF_FLOOR_ID,
+    CONF_FLOOR_NAME,
+    CONF_FLOOR_POSITIONS_PATH,
+    CONF_FLOOR_STL_PATH,
+    CONF_FLOORS,
     CONF_STATE_COLORS,
-    CONF_STL_PATH,
     DEFAULT_STATE_COLORS,
     DOMAIN,
     STATIC_URL_BASE,
@@ -25,12 +30,24 @@ from .panel import async_register_panel
 
 _LOGGER = logging.getLogger(__name__)
 
+FLOOR_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_FLOOR_ID): cv.string,
+        vol.Required(CONF_FLOOR_NAME): cv.string,
+        vol.Required(CONF_FLOOR_STL_PATH): cv.isfile,
+        vol.Required(CONF_FLOOR_POSITIONS_PATH): cv.isfile,
+    }
+)
+
 CONFIG_SCHEMA = vol.Schema(
     {
         DOMAIN: vol.Schema(
             {
-                vol.Required(CONF_STL_PATH): cv.isfile,
-                vol.Required(CONF_POSITIONS_PATH): cv.isfile,
+                # At least one floor is required (e.g. "Ebene 0" / ground floor).
+                # Add more entries to this list to add more floors.
+                vol.Required(CONF_FLOORS): vol.All(
+                    cv.ensure_list, [FLOOR_SCHEMA], vol.Length(min=1)
+                ),
                 vol.Optional(
                     CONF_STATE_COLORS, default=DEFAULT_STATE_COLORS
                 ): {cv.string: cv.string},
@@ -41,24 +58,67 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 
-class House3DModelView(HomeAssistantView):
-    """Serves the configured STL file to the frontend panel."""
+def _slugify(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
+    return slug or "ebene"
 
-    url = API_MODEL_PATH
-    name = f"api:{DOMAIN}:model"
+
+def _build_floor_registry(floors_config: list[dict]) -> dict[str, dict]:
+    """Assign a stable, unique id to every configured floor."""
+    registry: dict[str, dict] = {}
+    for floor in floors_config:
+        floor_id = floor.get(CONF_FLOOR_ID) or _slugify(floor[CONF_FLOOR_NAME])
+        base_id = floor_id
+        suffix = 2
+        while floor_id in registry:
+            floor_id = f"{base_id}-{suffix}"
+            suffix += 1
+        registry[floor_id] = floor
+    return registry
+
+
+class House3DFloorsListView(HomeAssistantView):
+    """Lists the configured floors so the frontend can build a switcher."""
+
+    url = API_FLOORS_LIST_PATH
+    name = f"api:{DOMAIN}:floors"
     requires_auth = True
 
-    def __init__(self, hass: HomeAssistant, stl_path: str) -> None:
-        self._hass = hass
-        self._stl_path = stl_path
+    def __init__(self, floors: dict[str, dict]) -> None:
+        self._floors = floors
 
     async def get(self, request: web.Request) -> web.Response:
+        return web.json_response(
+            [
+                {"id": floor_id, "name": floor[CONF_FLOOR_NAME]}
+                for floor_id, floor in self._floors.items()
+            ]
+        )
+
+
+class House3DModelView(HomeAssistantView):
+    """Serves a floor's STL file to the frontend panel."""
+
+    url = API_FLOOR_MODEL_PATH
+    name = f"api:{DOMAIN}:floor_model"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant, floors: dict[str, dict]) -> None:
+        self._hass = hass
+        self._floors = floors
+
+    async def get(self, request: web.Request) -> web.Response:
+        floor = self._floors.get(request.match_info["floor_id"])
+        if floor is None:
+            return web.Response(status=404)
         try:
             data = await self._hass.async_add_executor_job(
-                self._read_file, self._stl_path
+                self._read_file, floor[CONF_FLOOR_STL_PATH]
             )
         except OSError as err:
-            _LOGGER.error("Could not read STL file %s: %s", self._stl_path, err)
+            _LOGGER.error(
+                "Could not read STL file %s: %s", floor[CONF_FLOOR_STL_PATH], err
+            )
             return web.Response(status=404)
         return web.Response(body=data, content_type="application/sla")
 
@@ -69,27 +129,32 @@ class House3DModelView(HomeAssistantView):
 
 
 class House3DPositionsView(HomeAssistantView):
-    """Serves the positions JSON, enriched with the configured color mapping."""
+    """Serves a floor's positions JSON, enriched with the color mapping."""
 
-    url = API_POSITIONS_PATH
-    name = f"api:{DOMAIN}:positions"
+    url = API_FLOOR_POSITIONS_PATH
+    name = f"api:{DOMAIN}:floor_positions"
     requires_auth = True
 
     def __init__(
-        self, hass: HomeAssistant, positions_path: str, state_colors: dict
+        self, hass: HomeAssistant, floors: dict[str, dict], state_colors: dict
     ) -> None:
         self._hass = hass
-        self._positions_path = positions_path
+        self._floors = floors
         self._state_colors = state_colors
 
     async def get(self, request: web.Request) -> web.Response:
+        floor = self._floors.get(request.match_info["floor_id"])
+        if floor is None:
+            return web.Response(status=404)
         try:
             data = await self._hass.async_add_executor_job(
-                self._read_json, self._positions_path
+                self._read_json, floor[CONF_FLOOR_POSITIONS_PATH]
             )
         except (OSError, json.JSONDecodeError) as err:
             _LOGGER.error(
-                "Could not read positions file %s: %s", self._positions_path, err
+                "Could not read positions file %s: %s",
+                floor[CONF_FLOOR_POSITIONS_PATH],
+                err,
             )
             return web.Response(status=404)
         data["state_colors"] = self._state_colors
@@ -104,25 +169,21 @@ class House3DPositionsView(HomeAssistantView):
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Haus 3D Viewer integration from YAML."""
     conf = config[DOMAIN]
-    hass.data[DOMAIN] = conf
+    floors = _build_floor_registry(conf[CONF_FLOORS])
+    hass.data[DOMAIN] = {"floors": floors, CONF_STATE_COLORS: conf[CONF_STATE_COLORS]}
 
     www_path = hass.config.path(f"custom_components/{DOMAIN}/www")
     await _async_register_static_path(hass, STATIC_URL_BASE, www_path)
 
-    hass.http.register_view(House3DModelView(hass, conf[CONF_STL_PATH]))
+    hass.http.register_view(House3DFloorsListView(floors))
+    hass.http.register_view(House3DModelView(hass, floors))
     hass.http.register_view(
-        House3DPositionsView(
-            hass, conf[CONF_POSITIONS_PATH], conf[CONF_STATE_COLORS]
-        )
+        House3DPositionsView(hass, floors, conf[CONF_STATE_COLORS])
     )
 
     await async_register_panel(hass)
 
-    _LOGGER.debug(
-        "Haus 3D Viewer set up (stl=%s, positions=%s)",
-        conf[CONF_STL_PATH],
-        conf[CONF_POSITIONS_PATH],
-    )
+    _LOGGER.debug("Haus 3D Viewer set up with floors: %s", list(floors))
     return True
 
 

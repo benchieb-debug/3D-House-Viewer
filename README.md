@@ -7,6 +7,8 @@ klickbare, farbcodierte Marker im Raum darstellt.
 *(Screenshot folgt nach dem ersten Testlauf mit echten Scan-Daten)*
 
 - Halbtransparentes Haus-Mesh mit Kantenlinien (bewusst kein Foto-Realismus)
+- Mehrere Ebenen ("Etagen") mit Umschalter im Panel — mindestens eine Ebene
+  ist Pflicht, beliebig viele weitere lassen sich per YAML ergänzen
 - Marker-Farbe live aus dem Entity-State (Mapping konfigurierbar)
 - Klick auf Marker öffnet den nativen Home-Assistant "Mehr Info"-Dialog
 - Kamera-Steuerung per Maus/Touch (Zoom/Pan/Rotate)
@@ -38,8 +40,13 @@ In `configuration.yaml`:
 
 ```yaml
 house3d_viewer:
-  stl_path: /config/house3d/house.stl
-  positions_path: /config/house3d/positions.json
+  floors:
+    - name: "Ebene 0"
+      stl_path: /config/house3d/ebene0.stl
+      positions_path: /config/house3d/ebene0-positions.json
+    - name: "Ebene 1"
+      stl_path: /config/house3d/ebene1.stl
+      positions_path: /config/house3d/ebene1-positions.json
   state_colors:
     "on": "#2ecc71"
     "off": "#e74c3c"
@@ -49,9 +56,17 @@ house3d_viewer:
 
 | Option | Pflicht | Beschreibung |
 |---|---|---|
-| `stl_path` | ja | Absoluter Pfad zur STL-Datei des Hauses |
-| `positions_path` | ja | Absoluter Pfad zur Positions-JSON-Datei (Schema siehe unten) |
-| `state_colors` | nein | Mapping Entity-State → Hex-Farbe. Nicht abgedeckte States fallen auf `unknown` bzw. Grau zurück |
+| `floors` | ja | Liste von Ebenen, mindestens ein Eintrag ist Pflicht |
+| `floors[].id` | nein | Stabile ID der Ebene (z. B. für URLs). Wird sonst automatisch aus `name` abgeleitet |
+| `floors[].name` | ja | Anzeigename im Ebenen-Umschalter, z. B. `"Ebene 0"` |
+| `floors[].stl_path` | ja | Absoluter Pfad zur STL-Datei dieser Ebene |
+| `floors[].positions_path` | ja | Absoluter Pfad zur Positions-JSON-Datei dieser Ebene (Schema siehe unten) |
+| `state_colors` | nein | Mapping Entity-State → Hex-Farbe, gilt für alle Ebenen. Nicht abgedeckte States fallen auf `unknown` bzw. Grau zurück |
+
+Um eine weitere Ebene hinzuzufügen, einfach einen neuen Eintrag unter
+`floors:` ergänzen und Home Assistant neu starten. Ab zwei Ebenen erscheint
+automatisch ein Umschalter oben rechts im Panel; bei nur einer Ebene wird er
+ausgeblendet.
 
 Nach dem Ändern der YAML-Konfiguration Home Assistant neu starten. Der
 Reiter **"Haus 3D"** erscheint danach in der Sidebar.
@@ -84,10 +99,11 @@ sie trifft keine Annahmen über die Herkunft der Daten:
 
 ## Testen mit Dummy-Daten
 
-Im Ordner [`test_data/`](test_data/) liegen ein einfacher Testhaus-Würfel
-(`test-house.stl`) sowie ein Beispiel-JSON mit drei Dummy-Entities
-(`positions.json`), mit denen sich das Panel ohne echten Scan testen lässt.
-Einfach in der YAML-Config auf diese beiden Dateien verweisen.
+Im Ordner [`test_data/`](test_data/) liegen zwei einfache Testhaus-Würfel
+mit je einem Beispiel-JSON (`ebene0-haus.stl`/`ebene0-positions.json` und
+`ebene1-haus.stl`/`ebene1-positions.json`), mit denen sich das Panel inkl.
+Ebenen-Umschalter ohne echten Scan testen lässt. Einfach in der YAML-Config
+auf diese Dateien verweisen (siehe Beispiel oben).
 
 ## Nicht Teil dieser Integration
 

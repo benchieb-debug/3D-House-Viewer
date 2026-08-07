@@ -1,0 +1,21 @@
+{
+  "coordinate_system": "right-handed, meters, origin = scan start point",
+  "markers": [
+    {
+      "entity_id": "light.schlafzimmer_deckenlicht",
+      "room": "Schlafzimmer",
+      "x": 1.5,
+      "y": 2.3,
+      "z": 1.0,
+      "label": "Deckenlicht"
+    },
+    {
+      "entity_id": "binary_sensor.bad_fenster",
+      "room": "Bad",
+      "x": 4.2,
+      "y": 1.0,
+      "z": 3.1,
+      "label": "Fenstersensor"
+    }
+  ]
+}
