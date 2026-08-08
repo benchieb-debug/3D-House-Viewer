@@ -197,10 +197,13 @@ class House3DMarkerUpdateView(HomeAssistantView):
             z = float(body["z"])
         except (ValueError, TypeError, KeyError, json.JSONDecodeError):
             return web.Response(status=400, text="x/y/z (Zahlen) erforderlich")
+        # Optionale manuelle Farb-Übersteuerung; null/fehlend löscht eine zuvor gesetzte Farbe
+        # wieder (Grau/State-Farbe bleibt sonst immer der Standard).
+        color = body.get("color")
 
         try:
             updated = await self._hass.async_add_executor_job(
-                self._update_marker, floor[CONF_FLOOR_POSITIONS_PATH], index, x, y, z
+                self._update_marker, floor[CONF_FLOOR_POSITIONS_PATH], index, x, y, z, color
             )
         except IndexError:
             return web.Response(status=404, text="marker_index außerhalb des Bereichs")
@@ -215,7 +218,9 @@ class House3DMarkerUpdateView(HomeAssistantView):
         return web.json_response(updated)
 
     @staticmethod
-    def _update_marker(path: str, index: int, x: float, y: float, z: float) -> dict:
+    def _update_marker(
+        path: str, index: int, x: float, y: float, z: float, color: str | None
+    ) -> dict:
         with open(path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
         markers = data.get("markers", [])
@@ -224,6 +229,10 @@ class House3DMarkerUpdateView(HomeAssistantView):
         markers[index]["x"] = x
         markers[index]["y"] = y
         markers[index]["z"] = z
+        if color:
+            markers[index]["color"] = color
+        else:
+            markers[index].pop("color", None)
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2, sort_keys=True, ensure_ascii=False)
         return markers[index]
@@ -255,6 +264,7 @@ class House3DMarkerCreateView(HomeAssistantView):
         entity_id = str(body.get("entity_id", ""))
         room = str(body.get("room", ""))
         label = str(body.get("label", ""))
+        color = body.get("color") or None
 
         try:
             created = await self._hass.async_add_executor_job(
@@ -263,6 +273,7 @@ class House3DMarkerCreateView(HomeAssistantView):
                 entity_id,
                 room,
                 label,
+                color,
                 x,
                 y,
                 z,
@@ -279,7 +290,14 @@ class House3DMarkerCreateView(HomeAssistantView):
 
     @staticmethod
     def _append_marker(
-        path: str, entity_id: str, room: str, label: str, x: float, y: float, z: float
+        path: str,
+        entity_id: str,
+        room: str,
+        label: str,
+        color: str | None,
+        x: float,
+        y: float,
+        z: float,
     ) -> dict:
         with open(path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
@@ -292,6 +310,8 @@ class House3DMarkerCreateView(HomeAssistantView):
             "y": y,
             "z": z,
         }
+        if color:
+            new_marker["color"] = color
         markers.append(new_marker)
         index = len(markers) - 1
         with open(path, "w", encoding="utf-8") as handle:

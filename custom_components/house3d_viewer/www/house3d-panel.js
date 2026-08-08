@@ -80,19 +80,20 @@ class House3DViewerPanel extends HTMLElement {
       :host { display: block; position: relative; height: 100%; width: 100%; }
       #container { position: absolute; inset: 0; overflow: hidden; background: var(--primary-background-color, #111); }
       #topLeft { position: absolute; top: 12px; left: 12px; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-      #status { font-family: var(--paper-font-body1_-_font-family, sans-serif); color: var(--primary-text-color, #eee); background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px; font-size: 13px; }
+      #status { font-family: var(--paper-font-body1_-_font-family, sans-serif); color: #fff; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px; font-size: 13px; }
       #floors { position: absolute; top: 12px; right: 12px; z-index: 1; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 60%; }
-      .floor-btn { font-family: var(--paper-font-body1_-_font-family, sans-serif); font-size: 13px; padding: 6px 14px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.4); color: var(--primary-text-color, #eee); cursor: pointer; }
-      .floor-btn.active { background: var(--primary-color, #03a9f4); border-color: var(--primary-color, #03a9f4); color: var(--text-primary-color, #fff); font-weight: 500; }
-      #markerEdit { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2; background: rgba(20,20,20,0.92); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 12px 14px; display: none; flex-direction: column; gap: 8px; min-width: 220px; font-family: var(--paper-font-body1_-_font-family, sans-serif); color: var(--primary-text-color, #eee); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
-      #markerEdit .me-title { font-size: 13px; font-weight: 600; opacity: 0.9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      #markerEdit .me-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-      #markerEdit .me-row label { width: 14px; opacity: 0.75; }
+      .floor-btn { font-family: var(--paper-font-body1_-_font-family, sans-serif); font-size: 13px; padding: 6px 14px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.4); color: #fff; cursor: pointer; }
+      .floor-btn.active { background: var(--primary-color, #03a9f4); border-color: var(--primary-color, #03a9f4); color: #fff; font-weight: 500; }
+      #markerEdit { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2; background: rgba(20,20,20,0.92); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 12px 14px; display: none; flex-direction: column; gap: 8px; min-width: 220px; font-family: var(--paper-font-body1_-_font-family, sans-serif); color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+      #markerEdit .me-title { font-size: 13px; font-weight: 600; opacity: 0.9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; }
+      #markerEdit .me-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #fff; }
+      #markerEdit .me-row label { width: 14px; opacity: 0.9; color: #fff; }
       #markerEdit .me-row.me-text label { width: auto; }
-      #markerEdit .me-row input { flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.25); color: inherit; border-radius: 6px; padding: 4px 8px; font-size: 13px; min-width: 0; }
+      #markerEdit .me-row input { flex: 1; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); color: #fff; border-radius: 6px; padding: 4px 8px; font-size: 13px; min-width: 0; }
+      #markerEdit .me-row input[type="color"] { padding: 2px; height: 26px; }
       #markerEdit .me-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
-      #markerEdit button { font-family: inherit; font-size: 13px; padding: 5px 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); color: inherit; cursor: pointer; }
-      #markerEdit .me-save { background: var(--primary-color, #03a9f4); border-color: var(--primary-color, #03a9f4); color: var(--text-primary-color, #fff); font-weight: 500; }
+      #markerEdit button { font-family: inherit; font-size: 13px; padding: 5px 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.12); color: #fff; cursor: pointer; }
+      #markerEdit .me-save { background: var(--primary-color, #03a9f4); border-color: var(--primary-color, #03a9f4); color: #fff; font-weight: 500; }
       canvas { display: block; touch-action: none; }
     `;
     const container = document.createElement("div");
@@ -132,6 +133,10 @@ class House3DViewerPanel extends HTMLElement {
       <div class="me-row"><label>X</label><input type="number" step="0.01" class="me-x"></div>
       <div class="me-row"><label>Y</label><input type="number" step="0.01" class="me-y"></div>
       <div class="me-row"><label>Z</label><input type="number" step="0.01" class="me-z"></div>
+      <div class="me-row me-text">
+        <label><input type="checkbox" class="me-color-enabled"> Farbe</label>
+        <input type="color" class="me-color" value="#9e9e9e" disabled>
+      </div>
       <div class="me-actions">
         <button type="button" class="me-cancel">Abbrechen</button>
         <button type="button" class="me-save">Speichern</button>
@@ -139,6 +144,9 @@ class House3DViewerPanel extends HTMLElement {
     `;
     markerEdit.querySelector(".me-cancel").addEventListener("click", () => this._closeMarkerEditor());
     markerEdit.querySelector(".me-save").addEventListener("click", () => this._saveMarkerEditor());
+    markerEdit.querySelector(".me-color-enabled").addEventListener("change", (event) => {
+      markerEdit.querySelector(".me-color").disabled = !event.target.checked;
+    });
 
     container.appendChild(topLeft);
     container.appendChild(floors);
@@ -163,6 +171,8 @@ class House3DViewerPanel extends HTMLElement {
     this._markerEditXEl = markerEdit.querySelector(".me-x");
     this._markerEditYEl = markerEdit.querySelector(".me-y");
     this._markerEditZEl = markerEdit.querySelector(".me-z");
+    this._markerEditColorEnabledEl = markerEdit.querySelector(".me-color-enabled");
+    this._markerEditColorEl = markerEdit.querySelector(".me-color");
     this._editingMarkerIndex = null;
   }
 
@@ -474,9 +484,10 @@ class House3DViewerPanel extends HTMLElement {
     this._updateMarkerColors();
   }
 
-  // Legt eine Marker-Kugel für ein {entity_id, room, label, x, y, z}-Objekt an und trägt sie in
-  // this._markers ein — gemeinsam genutzt beim initialen Laden einer Ebene und beim Anlegen eines
-  // neuen Punkts über "+ Punkt".
+  // Legt eine Marker-Kugel für ein {entity_id, room, label, color, x, y, z}-Objekt an und trägt
+  // sie in this._markers ein — gemeinsam genutzt beim initialen Laden einer Ebene und beim
+  // Anlegen eines neuen Punkts über "+ Punkt". `color` ist optional (manuelle Übersteuerung);
+  // ohne color bleibt Grau/State-Farbe wie bisher der Standard.
   _addMarkerMesh(marker) {
     const geometry = new THREE.SphereGeometry(0.08, 16, 16);
     const material = new THREE.MeshStandardMaterial({ color: FALLBACK_COLOR });
@@ -489,6 +500,7 @@ class House3DViewerPanel extends HTMLElement {
       entityId: marker.entity_id,
       room: marker.room,
       label: marker.label,
+      color: marker.color || null,
     };
     this._markers.push(entry);
     return entry;
@@ -510,6 +522,11 @@ class House3DViewerPanel extends HTMLElement {
       return;
     }
     for (const marker of this._markers) {
+      // Manuelle Farb-Übersteuerung gewinnt immer, unabhängig vom Entity-State.
+      if (marker.color) {
+        marker.mesh.material.color.set(marker.color);
+        continue;
+      }
       const stateObj = this._hass.states[marker.entityId];
       const prevStateObj = previousHass && previousHass.states[marker.entityId];
       if (stateObj === prevStateObj) {
@@ -582,6 +599,7 @@ class House3DViewerPanel extends HTMLElement {
     this._markerEditTitleEl.textContent =
       marker.label || marker.entityId || marker.room || `Marker ${index + 1}`;
     this._setMarkerEditFields(pos.x, pos.y, pos.z);
+    this._setMarkerEditColor(marker.color);
     this._markerEditEl.style.display = "flex";
   }
 
@@ -596,7 +614,16 @@ class House3DViewerPanel extends HTMLElement {
     this._markerEditRoomEl.value = "";
     this._markerEditLabelEl.value = "";
     this._setMarkerEditFields(point.x, point.y, point.z);
+    this._setMarkerEditColor(null); // neue Marker starten grau, bis der Nutzer eine Farbe wählt
     this._markerEditEl.style.display = "flex";
+  }
+
+  // Grau (kein `color`-Feld im Datensatz) bleibt der Standard — die Checkbox aktiviert erst dann
+  // eine manuelle Übersteuerungsfarbe, wenn der Nutzer sie explizit anhakt.
+  _setMarkerEditColor(color) {
+    this._markerEditColorEnabledEl.checked = !!color;
+    this._markerEditColorEl.disabled = !color;
+    this._markerEditColorEl.value = color || "#9e9e9e";
   }
 
   _setEntityRowsVisible(visible) {
@@ -635,14 +662,17 @@ class House3DViewerPanel extends HTMLElement {
       return;
     }
 
+    // null (nicht weglassen!) löscht eine zuvor gesetzte Übersteuerungsfarbe beim Bearbeiten.
+    const color = this._markerEditColorEnabledEl.checked ? this._markerEditColorEl.value : null;
+
     if (this._creatingAtPoint) {
-      await this._createMarker(x, y, z);
+      await this._createMarker(x, y, z, color);
     } else {
-      await this._updateMarker(this._editingMarkerIndex, x, y, z);
+      await this._updateMarker(this._editingMarkerIndex, x, y, z, color);
     }
   }
 
-  async _updateMarker(index, x, y, z) {
+  async _updateMarker(index, x, y, z, color) {
     const apiBase = this._panelConfig.api_base;
     try {
       const resp = await this._hass.fetchWithAuth(
@@ -650,7 +680,7 @@ class House3DViewerPanel extends HTMLElement {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ x, y, z }),
+          body: JSON.stringify({ x, y, z, color }),
         }
       );
       if (!resp.ok) {
@@ -659,14 +689,17 @@ class House3DViewerPanel extends HTMLElement {
       const marker = this._markers[index];
       if (marker) {
         marker.mesh.position.set(x, y, z);
+        marker.color = color;
+        this._updateMarkerColors();
       }
       this._closeMarkerEditor();
     } catch (err) {
       console.error("[house3d-viewer] Marker-Update fehlgeschlagen:", err);
+      this._flashError("Speichern fehlgeschlagen. Siehe Konsole.");
     }
   }
 
-  async _createMarker(x, y, z) {
+  async _createMarker(x, y, z, color) {
     const apiBase = this._panelConfig.api_base;
     const entity_id = this._markerEditEntityEl.value.trim();
     const room = this._markerEditRoomEl.value.trim();
@@ -675,17 +708,26 @@ class House3DViewerPanel extends HTMLElement {
       const resp = await this._hass.fetchWithAuth(`${apiBase}/floors/${this._currentFloorId}/markers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entity_id, room, label, x, y, z }),
+        body: JSON.stringify({ entity_id, room, label, color, x, y, z }),
       });
       if (!resp.ok) {
         throw new Error(`marker create HTTP ${resp.status}`);
       }
-      this._addMarkerMesh({ entity_id, room, label, x, y, z });
+      this._addMarkerMesh({ entity_id, room, label, color, x, y, z });
       this._updateMarkerColors();
       this._closeMarkerEditor();
     } catch (err) {
       console.error("[house3d-viewer] Marker-Erstellung fehlgeschlagen:", err);
+      this._flashError("Erstellen fehlgeschlagen. Siehe Konsole.");
     }
+  }
+
+  // Zeigt einen Fehler kurz sichtbar im Status-Feld (Fehler landeten bisher nur in der Browser-
+  // Konsole, was beim Debuggen "es passiert einfach nichts" unnötig erschwert hat).
+  _flashError(text) {
+    this._setStatus(text);
+    clearTimeout(this._errorFlashTimeout);
+    this._errorFlashTimeout = setTimeout(() => this._setStatus(null), 4000);
   }
 }
 
