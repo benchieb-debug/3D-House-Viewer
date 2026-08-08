@@ -237,6 +237,44 @@ class House3DMarkerUpdateView(HomeAssistantView):
             json.dump(data, handle, indent=2, sort_keys=True, ensure_ascii=False)
         return markers[index]
 
+    async def delete(
+        self, request: web.Request, floor_id: str, marker_index: str
+    ) -> web.Response:
+        floor = self._floors.get(floor_id)
+        if floor is None:
+            return web.Response(status=404)
+        try:
+            index = int(marker_index)
+        except ValueError:
+            return web.Response(status=400, text="marker_index muss eine Zahl sein")
+
+        try:
+            await self._hass.async_add_executor_job(
+                self._delete_marker, floor[CONF_FLOOR_POSITIONS_PATH], index
+            )
+        except IndexError:
+            return web.Response(status=404, text="marker_index außerhalb des Bereichs")
+        except (OSError, json.JSONDecodeError) as err:
+            _LOGGER.error(
+                "Could not delete from positions file %s: %s",
+                floor[CONF_FLOOR_POSITIONS_PATH],
+                err,
+            )
+            return web.Response(status=500)
+
+        return web.Response(status=204)
+
+    @staticmethod
+    def _delete_marker(path: str, index: int) -> None:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        markers = data.get("markers", [])
+        if not 0 <= index < len(markers):
+            raise IndexError(f"marker index {index} out of range")
+        markers.pop(index)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(data, handle, indent=2, sort_keys=True, ensure_ascii=False)
+
 
 class House3DMarkerCreateView(HomeAssistantView):
     """Appends a new marker to positions.json (the "+ Punkt" button in the panel)."""

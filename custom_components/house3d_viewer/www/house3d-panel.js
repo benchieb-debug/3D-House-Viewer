@@ -28,6 +28,10 @@ class House3DViewerPanel extends HTMLElement {
     this._houseMesh = null;
     this._axesGroup = null;
     this._axesVisible = false;
+    // Bearbeiten-Modus (Stift-Toggle): erzeugen/bearbeiten/löschen von Punkten ist nur möglich,
+    // wenn dieser aktiv ist — verhindert versehentliches Verschieben/Löschen beim normalen
+    // Ansehen. Klick auf einen Marker öffnet immer den HA-more-info-Dialog, unabhängig davon.
+    this._editMode = false;
     this._placingMode = false; // "Neuer Punkt": nächster Klick auf das Modell legt einen Marker an
     this._loadToken = 0; // guards against a slow floor switch overwriting a newer one
     this._onResize = this._onResize.bind(this);
@@ -94,6 +98,7 @@ class House3DViewerPanel extends HTMLElement {
       #markerEdit .me-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
       #markerEdit button { font-family: inherit; font-size: 13px; padding: 5px 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.12); color: #fff; cursor: pointer; }
       #markerEdit .me-save { background: var(--primary-color, #03a9f4); border-color: var(--primary-color, #03a9f4); color: #fff; font-weight: 500; }
+      #markerEdit .me-delete { background: rgba(255,59,48,0.85); border-color: rgba(255,59,48,0.85); color: #fff; }
       canvas { display: block; touch-action: none; }
     `;
     const container = document.createElement("div");
@@ -106,6 +111,11 @@ class House3DViewerPanel extends HTMLElement {
     status.id = "status";
     status.textContent = "Lade Ebenen…";
 
+    const editToggle = document.createElement("button");
+    editToggle.className = "floor-btn";
+    editToggle.textContent = "✎ Bearbeiten";
+    editToggle.addEventListener("click", () => this._toggleEditMode());
+
     const axesToggle = document.createElement("button");
     axesToggle.className = "floor-btn";
     axesToggle.textContent = "Achsen";
@@ -114,9 +124,11 @@ class House3DViewerPanel extends HTMLElement {
     const addMarkerToggle = document.createElement("button");
     addMarkerToggle.className = "floor-btn";
     addMarkerToggle.textContent = "+ Punkt";
+    addMarkerToggle.style.display = "none"; // nur sichtbar im Bearbeiten-Modus
     addMarkerToggle.addEventListener("click", () => this._togglePlacingMode());
 
     topLeft.appendChild(status);
+    topLeft.appendChild(editToggle);
     topLeft.appendChild(axesToggle);
     topLeft.appendChild(addMarkerToggle);
 
@@ -138,12 +150,15 @@ class House3DViewerPanel extends HTMLElement {
         <input type="color" class="me-color" value="#9e9e9e" disabled>
       </div>
       <div class="me-actions">
+        <button type="button" class="me-delete">Löschen</button>
+        <span style="flex:1"></span>
         <button type="button" class="me-cancel">Abbrechen</button>
         <button type="button" class="me-save">Speichern</button>
       </div>
     `;
     markerEdit.querySelector(".me-cancel").addEventListener("click", () => this._closeMarkerEditor());
     markerEdit.querySelector(".me-save").addEventListener("click", () => this._saveMarkerEditor());
+    markerEdit.querySelector(".me-delete").addEventListener("click", () => this._deleteMarkerFromEditor());
     markerEdit.querySelector(".me-color-enabled").addEventListener("change", (event) => {
       markerEdit.querySelector(".me-color").disabled = !event.target.checked;
     });
@@ -158,9 +173,11 @@ class House3DViewerPanel extends HTMLElement {
     this._container = container;
     this._statusEl = status;
     this._floorsEl = floors;
+    this._editToggleEl = editToggle;
     this._axesToggleEl = axesToggle;
     this._addMarkerToggleEl = addMarkerToggle;
     this._markerEditEl = markerEdit;
+    this._markerEditDeleteEl = markerEdit.querySelector(".me-delete");
     this._markerEditTitleEl = markerEdit.querySelector(".me-title");
     this._markerEditEntityRow = markerEdit.querySelector(".me-entity");
     this._markerEditRoomRow = markerEdit.querySelector(".me-room-row");
@@ -329,6 +346,21 @@ class House3DViewerPanel extends HTMLElement {
     this._placingMode = !this._placingMode;
     this._addMarkerToggleEl.classList.toggle("active", this._placingMode);
     this._setStatus(this._placingMode ? "Tippe auf das Modell, um einen Punkt zu setzen" : null);
+  }
+
+  // Stift-Button: schaltet frei, ob Punkte erzeugt/bearbeitet/gelöscht werden können. Im
+  // Normalzustand (aus) öffnet ein Marker-Klick nur den HA-more-info-Dialog, damit beim
+  // Ansehen nichts versehentlich verschoben oder gelöscht wird.
+  _toggleEditMode() {
+    this._editMode = !this._editMode;
+    this._editToggleEl.classList.toggle("active", this._editMode);
+    this._addMarkerToggleEl.style.display = this._editMode ? "" : "none";
+    if (!this._editMode) {
+      if (this._placingMode) {
+        this._togglePlacingMode();
+      }
+      this._closeMarkerEditor();
+    }
   }
 
   // Farbige Achsenlinien vom Ursprung (Modellmittelpunkt nach geometry.center()) mit
@@ -572,7 +604,9 @@ class House3DViewerPanel extends HTMLElement {
     if (hit.entityId) {
       this._fireMoreInfo(hit.entityId);
     }
-    this._openMarkerEditor(hit, index);
+    if (this._editMode) {
+      this._openMarkerEditor(hit, index);
+    }
   }
 
   _fireMoreInfo(entityId) {
@@ -595,6 +629,7 @@ class House3DViewerPanel extends HTMLElement {
     this._editingMarkerIndex = index;
     this._creatingAtPoint = null;
     this._setEntityRowsVisible(false); // Bestehende Marker: nur Position bearbeiten, wie gewünscht
+    this._markerEditDeleteEl.style.display = "";
     const pos = marker.mesh.position;
     this._markerEditTitleEl.textContent =
       marker.label || marker.entityId || marker.room || `Marker ${index + 1}`;
@@ -609,6 +644,7 @@ class House3DViewerPanel extends HTMLElement {
     this._editingMarkerIndex = null;
     this._creatingAtPoint = point;
     this._setEntityRowsVisible(true);
+    this._markerEditDeleteEl.style.display = "none"; // beim Neuanlegen gibt es noch nichts zu löschen
     this._markerEditTitleEl.textContent = "Neuer Punkt";
     this._markerEditEntityEl.value = "";
     this._markerEditRoomEl.value = "";
@@ -719,6 +755,37 @@ class House3DViewerPanel extends HTMLElement {
     } catch (err) {
       console.error("[house3d-viewer] Marker-Erstellung fehlgeschlagen:", err);
       this._flashError("Erstellen fehlgeschlagen. Siehe Konsole.");
+    }
+  }
+
+  // "Löschen" im Bearbeiten-Panel — nur für bestehende Marker sichtbar (siehe _openMarkerEditor).
+  // Entfernt Index i sowohl serverseitig (positions.json) als auch lokal aus this._markers; da
+  // beide Arrays dieselbe Reihenfolge halten, bleiben nachfolgende Indizes danach konsistent.
+  async _deleteMarkerFromEditor() {
+    if (this._editingMarkerIndex === null) {
+      return;
+    }
+    const index = this._editingMarkerIndex;
+    const apiBase = this._panelConfig.api_base;
+    try {
+      const resp = await this._hass.fetchWithAuth(
+        `${apiBase}/floors/${this._currentFloorId}/markers/${index}`,
+        { method: "DELETE" }
+      );
+      if (!resp.ok) {
+        throw new Error(`marker delete HTTP ${resp.status}`);
+      }
+      const marker = this._markers[index];
+      if (marker) {
+        this._scene.remove(marker.mesh);
+        marker.mesh.geometry.dispose();
+        marker.mesh.material.dispose();
+      }
+      this._markers.splice(index, 1);
+      this._closeMarkerEditor();
+    } catch (err) {
+      console.error("[house3d-viewer] Marker-Löschung fehlgeschlagen:", err);
+      this._flashError("Löschen fehlgeschlagen. Siehe Konsole.");
     }
   }
 
