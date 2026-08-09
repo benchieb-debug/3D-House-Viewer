@@ -81,7 +81,11 @@ class House3DViewerPanel extends HTMLElement {
   _buildDom() {
     const style = document.createElement("style");
     style.textContent = `
-      :host { display: block; position: relative; height: 100%; width: 100%; }
+      /* min-height als Sicherheitsschwelle: height:100% braucht eine durchgängige Höhen-Kette bis
+         zum Wurzelelement, die je nach Browser/HA-Frontend-Version nicht zuverlässig ankommt (in
+         Firefox beobachtet: Host bekommt 0px Höhe, obwohl die Breite korrekt ist). min-height:100vh
+         erzwingt in diesem Fall trotzdem eine sichtbare Fläche, statt einen unsichtbaren 0px-Canvas. */
+      :host { display: block; position: relative; height: 100%; width: 100%; min-height: 100vh; }
       #container { position: absolute; inset: 0; overflow: hidden; background: var(--primary-background-color, #111); }
       #topLeft { position: absolute; top: 12px; left: 12px; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
       #status { font-family: var(--paper-font-body1_-_font-family, sans-serif); color: #fff; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px; font-size: 13px; }
