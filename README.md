@@ -4,7 +4,7 @@ Home-Assistant-Custom-Integration mit eigenem Sidebar-Panel, das dein
 gescanntes Haus als 3D-Modell (STL) anzeigt und Sensoren/Aktoren als
 klickbare, farbcodierte Marker im Raum darstellt.
 
-*(Screenshot folgt nach dem ersten Testlauf mit echten Scan-Daten)*
+![Panel-Ansicht mit Achsensystem und Marker-Dialog](docs/screenshot-marker-dialog.png)
 
 - Halbtransparentes Haus-Mesh mit Kantenlinien (bewusst kein Foto-Realismus)
 - Mehrere Ebenen ("Etagen") mit Umschalter im Panel — mindestens eine Ebene
@@ -70,6 +70,14 @@ ausgeblendet.
 
 Nach dem Ändern der YAML-Konfiguration Home Assistant neu starten. Der
 Reiter **"Haus 3D"** erscheint danach in der Sidebar.
+
+### Scan-Dateien einspielen
+
+Die STL- und Positions-JSON-Dateien landen am einfachsten per **Samba**
+direkt im `/config`-Verzeichnis (z. B. Ordner `house3d/`) — voraussetzt,
+das Samba-Add-on ist installiert und eingerichtet (siehe Add-on-Doku).
+Danach einfach wie oben unter `floors[].stl_path` /
+`floors[].positions_path` auf die kopierten Dateien verweisen.
 
 ## Positions-JSON-Schema
 
