@@ -1,0 +1,45 @@
+{
+  "coordinate_system": "arkit_meters_y_up",
+  "markers": [
+    {
+      "entity_id": "binary_sensor.eingangstor_tur",
+      "label": "Test0",
+      "room": "2",
+      "x": 0.0,
+      "y": 2.0,
+      "z": 0.0
+    },
+    {
+      "entity_id": "climate.bad_heizkorper_thermostatregle",
+      "label": "Test1",
+      "room": "2",
+      "x": 1.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    {
+      "entity_id": "sensor.bad_t_h_temperatur",
+      "label": "Test2",
+      "room": "2",
+      "x": 0.0,
+      "y": 1.0,
+      "z": 0.0
+    },
+    {
+      "entity_id": "sensor.contact_sensor_batterie",
+      "label": "Test3",
+      "room": "2",
+      "x": 0.0,
+      "y": 0.0,
+      "z": 3.0
+    },
+    {
+      "entity_id": "",
+      "label": "",
+      "room": "",
+      "x": -0.504,
+      "y": 0.926,
+      "z": -2.069
+    }
+  ]
+}
