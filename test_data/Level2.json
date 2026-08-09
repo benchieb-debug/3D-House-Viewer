@@ -1,0 +1,22 @@
+{
+  "coordinate_system": "right-handed, meters, origin = scan start point",
+  "markers": [
+    {
+      "entity_id": "light.schlafzimmer_deckenlicht",
+      "label": "Deckenlicht",
+      "room": "Schlafzimmer",
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    {
+      "color": "#ef03f9",
+      "entity_id": "device_tracker.pc_38_2c_e5_3c_15_b6",
+      "label": "GAteway",
+      "room": "Dach",
+      "x": -1.0,
+      "y": -1.0,
+      "z": 1.5
+    }
+  ]
+}
