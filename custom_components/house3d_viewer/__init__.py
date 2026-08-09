@@ -200,10 +200,22 @@ class House3DMarkerUpdateView(HomeAssistantView):
         # Optionale manuelle Farb-Übersteuerung; null/fehlend löscht eine zuvor gesetzte Farbe
         # wieder (Grau/State-Farbe bleibt sonst immer der Standard).
         color = body.get("color")
+        # Optionale Grenzwert-Regel (z. B. "Batterie < 10 → Rot"), zieht nur wenn keine manuelle
+        # Farbe gesetzt ist. Beide Felder null/fehlend löscht eine zuvor gesetzte Regel wieder.
+        threshold_below = body.get("threshold_below")
+        threshold_color = body.get("threshold_color")
 
         try:
             updated = await self._hass.async_add_executor_job(
-                self._update_marker, floor[CONF_FLOOR_POSITIONS_PATH], index, x, y, z, color
+                self._update_marker,
+                floor[CONF_FLOOR_POSITIONS_PATH],
+                index,
+                x,
+                y,
+                z,
+                color,
+                threshold_below,
+                threshold_color,
             )
         except IndexError:
             return web.Response(status=404, text="marker_index außerhalb des Bereichs")
@@ -219,7 +231,14 @@ class House3DMarkerUpdateView(HomeAssistantView):
 
     @staticmethod
     def _update_marker(
-        path: str, index: int, x: float, y: float, z: float, color: str | None
+        path: str,
+        index: int,
+        x: float,
+        y: float,
+        z: float,
+        color: str | None,
+        threshold_below: float | None,
+        threshold_color: str | None,
     ) -> dict:
         with open(path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
@@ -233,6 +252,12 @@ class House3DMarkerUpdateView(HomeAssistantView):
             markers[index]["color"] = color
         else:
             markers[index].pop("color", None)
+        if threshold_below is not None and threshold_color:
+            markers[index]["threshold_below"] = float(threshold_below)
+            markers[index]["threshold_color"] = threshold_color
+        else:
+            markers[index].pop("threshold_below", None)
+            markers[index].pop("threshold_color", None)
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2, sort_keys=True, ensure_ascii=False)
         return markers[index]
@@ -303,6 +328,8 @@ class House3DMarkerCreateView(HomeAssistantView):
         room = str(body.get("room", ""))
         label = str(body.get("label", ""))
         color = body.get("color") or None
+        threshold_below = body.get("threshold_below")
+        threshold_color = body.get("threshold_color") or None
 
         try:
             created = await self._hass.async_add_executor_job(
@@ -312,6 +339,8 @@ class House3DMarkerCreateView(HomeAssistantView):
                 room,
                 label,
                 color,
+                threshold_below,
+                threshold_color,
                 x,
                 y,
                 z,
@@ -333,6 +362,8 @@ class House3DMarkerCreateView(HomeAssistantView):
         room: str,
         label: str,
         color: str | None,
+        threshold_below: float | None,
+        threshold_color: str | None,
         x: float,
         y: float,
         z: float,
@@ -350,6 +381,9 @@ class House3DMarkerCreateView(HomeAssistantView):
         }
         if color:
             new_marker["color"] = color
+        if threshold_below is not None and threshold_color:
+            new_marker["threshold_below"] = float(threshold_below)
+            new_marker["threshold_color"] = threshold_color
         markers.append(new_marker)
         index = len(markers) - 1
         with open(path, "w", encoding="utf-8") as handle:

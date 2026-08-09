@@ -98,7 +98,8 @@ class House3DViewerPanel extends HTMLElement {
       #markerEdit .me-row label { width: 14px; opacity: 0.9; color: #fff; }
       #markerEdit .me-row.me-text label { width: auto; }
       #markerEdit .me-row input { flex: 1; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); color: #fff; border-radius: 6px; padding: 4px 8px; font-size: 13px; min-width: 0; }
-      #markerEdit .me-row input[type="color"] { padding: 2px; height: 26px; }
+      #markerEdit .me-row input[type="color"] { padding: 2px; height: 26px; flex: 0 0 44px; }
+      #markerEdit .me-threshold-inputs { padding-left: 22px; }
       #markerEdit .me-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
       #markerEdit button { font-family: inherit; font-size: 13px; padding: 5px 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.12); color: #fff; cursor: pointer; }
       #markerEdit .me-save { background: var(--primary-color, #03a9f4); border-color: var(--primary-color, #03a9f4); color: #fff; font-weight: 500; }
@@ -153,6 +154,13 @@ class House3DViewerPanel extends HTMLElement {
         <label><input type="checkbox" class="me-color-enabled"> Farbe</label>
         <input type="color" class="me-color" value="#9e9e9e" disabled>
       </div>
+      <div class="me-row me-text">
+        <label><input type="checkbox" class="me-threshold-enabled"> Warnfarbe wenn Wert unter</label>
+      </div>
+      <div class="me-row me-threshold-inputs">
+        <input type="number" step="0.1" class="me-threshold-value" placeholder="10" disabled>
+        <input type="color" class="me-threshold-color" value="#ff3b30" disabled>
+      </div>
       <div class="me-actions">
         <button type="button" class="me-delete">Löschen</button>
         <span style="flex:1"></span>
@@ -165,6 +173,10 @@ class House3DViewerPanel extends HTMLElement {
     markerEdit.querySelector(".me-delete").addEventListener("click", () => this._deleteMarkerFromEditor());
     markerEdit.querySelector(".me-color-enabled").addEventListener("change", (event) => {
       markerEdit.querySelector(".me-color").disabled = !event.target.checked;
+    });
+    markerEdit.querySelector(".me-threshold-enabled").addEventListener("change", (event) => {
+      markerEdit.querySelector(".me-threshold-value").disabled = !event.target.checked;
+      markerEdit.querySelector(".me-threshold-color").disabled = !event.target.checked;
     });
 
     container.appendChild(topLeft);
@@ -194,6 +206,9 @@ class House3DViewerPanel extends HTMLElement {
     this._markerEditZEl = markerEdit.querySelector(".me-z");
     this._markerEditColorEnabledEl = markerEdit.querySelector(".me-color-enabled");
     this._markerEditColorEl = markerEdit.querySelector(".me-color");
+    this._markerEditThresholdEnabledEl = markerEdit.querySelector(".me-threshold-enabled");
+    this._markerEditThresholdValueEl = markerEdit.querySelector(".me-threshold-value");
+    this._markerEditThresholdColorEl = markerEdit.querySelector(".me-threshold-color");
     this._editingMarkerIndex = null;
   }
 
@@ -537,6 +552,10 @@ class House3DViewerPanel extends HTMLElement {
       room: marker.room,
       label: marker.label,
       color: marker.color || null,
+      // Grenzwert-Regel: wenn der numerische State unter diesen Wert fällt (z. B. Batterie < 10),
+      // gewinnt thresholdColor gegenüber der normalen State-Farben-Zuordnung. Beide null = keine Regel.
+      thresholdBelow: typeof marker.threshold_below === "number" ? marker.threshold_below : null,
+      thresholdColor: marker.threshold_color || null,
     };
     this._markers.push(entry);
     return entry;
@@ -551,6 +570,19 @@ class House3DViewerPanel extends HTMLElement {
       this._stateColors.unknown ||
       FALLBACK_COLOR
     );
+  }
+
+  // Grenzwert-Regel geht vor der normalen State-Farbe, aber nach einer manuellen Übersteuerung
+  // (siehe _updateMarkerColors). Nicht-numerische States (z. B. "on"/"off") ignorieren die Regel
+  // einfach, statt einen Fehler zu werfen.
+  _colorForMarker(marker, state) {
+    if (marker.thresholdBelow !== null && marker.thresholdColor) {
+      const numeric = parseFloat(state);
+      if (Number.isFinite(numeric) && numeric < marker.thresholdBelow) {
+        return marker.thresholdColor;
+      }
+    }
+    return this._colorForState(state);
   }
 
   _updateMarkerColors(previousHass) {
@@ -569,7 +601,7 @@ class House3DViewerPanel extends HTMLElement {
         continue;
       }
       const state = stateObj ? stateObj.state : "unavailable";
-      marker.mesh.material.color.set(this._colorForState(state));
+      marker.mesh.material.color.set(this._colorForMarker(marker, state));
     }
   }
 
@@ -639,6 +671,7 @@ class House3DViewerPanel extends HTMLElement {
       marker.label || marker.entityId || marker.room || `Marker ${index + 1}`;
     this._setMarkerEditFields(pos.x, pos.y, pos.z);
     this._setMarkerEditColor(marker.color);
+    this._setMarkerEditThreshold(marker.thresholdBelow, marker.thresholdColor);
     this._markerEditEl.style.display = "flex";
   }
 
@@ -655,6 +688,7 @@ class House3DViewerPanel extends HTMLElement {
     this._markerEditLabelEl.value = "";
     this._setMarkerEditFields(point.x, point.y, point.z);
     this._setMarkerEditColor(null); // neue Marker starten grau, bis der Nutzer eine Farbe wählt
+    this._setMarkerEditThreshold(null, null);
     this._markerEditEl.style.display = "flex";
   }
 
@@ -664,6 +698,16 @@ class House3DViewerPanel extends HTMLElement {
     this._markerEditColorEnabledEl.checked = !!color;
     this._markerEditColorEl.disabled = !color;
     this._markerEditColorEl.value = color || "#9e9e9e";
+  }
+
+  // Grenzwert-Regel (z. B. "Batterie < 10 → Rot") ist standardmäßig aus, wie die manuelle Farbe.
+  _setMarkerEditThreshold(belowValue, color) {
+    const active = belowValue !== null && belowValue !== undefined && !!color;
+    this._markerEditThresholdEnabledEl.checked = active;
+    this._markerEditThresholdValueEl.disabled = !active;
+    this._markerEditThresholdColorEl.disabled = !active;
+    this._markerEditThresholdValueEl.value = active ? belowValue : "";
+    this._markerEditThresholdColorEl.value = color || "#ff3b30";
   }
 
   _setEntityRowsVisible(visible) {
@@ -704,15 +748,21 @@ class House3DViewerPanel extends HTMLElement {
 
     // null (nicht weglassen!) löscht eine zuvor gesetzte Übersteuerungsfarbe beim Bearbeiten.
     const color = this._markerEditColorEnabledEl.checked ? this._markerEditColorEl.value : null;
+    const thresholdActive = this._markerEditThresholdEnabledEl.checked;
+    const thresholdBelow = thresholdActive ? parseFloat(this._markerEditThresholdValueEl.value) : null;
+    const thresholdColor = thresholdActive ? this._markerEditThresholdColorEl.value : null;
+    if (thresholdActive && !Number.isFinite(thresholdBelow)) {
+      return; // Grenzwert aktiviert, aber keine gültige Zahl eingegeben
+    }
 
     if (this._creatingAtPoint) {
-      await this._createMarker(x, y, z, color);
+      await this._createMarker(x, y, z, color, thresholdBelow, thresholdColor);
     } else {
-      await this._updateMarker(this._editingMarkerIndex, x, y, z, color);
+      await this._updateMarker(this._editingMarkerIndex, x, y, z, color, thresholdBelow, thresholdColor);
     }
   }
 
-  async _updateMarker(index, x, y, z, color) {
+  async _updateMarker(index, x, y, z, color, thresholdBelow, thresholdColor) {
     const apiBase = this._panelConfig.api_base;
     try {
       const resp = await this._hass.fetchWithAuth(
@@ -720,7 +770,11 @@ class House3DViewerPanel extends HTMLElement {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ x, y, z, color }),
+          body: JSON.stringify({
+            x, y, z, color,
+            threshold_below: thresholdBelow,
+            threshold_color: thresholdColor,
+          }),
         }
       );
       if (!resp.ok) {
@@ -730,6 +784,8 @@ class House3DViewerPanel extends HTMLElement {
       if (marker) {
         marker.mesh.position.set(x, y, z);
         marker.color = color;
+        marker.thresholdBelow = thresholdBelow;
+        marker.thresholdColor = thresholdColor;
         this._updateMarkerColors();
       }
       this._closeMarkerEditor();
@@ -739,7 +795,7 @@ class House3DViewerPanel extends HTMLElement {
     }
   }
 
-  async _createMarker(x, y, z, color) {
+  async _createMarker(x, y, z, color, thresholdBelow, thresholdColor) {
     const apiBase = this._panelConfig.api_base;
     const entity_id = this._markerEditEntityEl.value.trim();
     const room = this._markerEditRoomEl.value.trim();
@@ -748,12 +804,20 @@ class House3DViewerPanel extends HTMLElement {
       const resp = await this._hass.fetchWithAuth(`${apiBase}/floors/${this._currentFloorId}/markers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entity_id, room, label, color, x, y, z }),
+        body: JSON.stringify({
+          entity_id, room, label, color, x, y, z,
+          threshold_below: thresholdBelow,
+          threshold_color: thresholdColor,
+        }),
       });
       if (!resp.ok) {
         throw new Error(`marker create HTTP ${resp.status}`);
       }
-      this._addMarkerMesh({ entity_id, room, label, color, x, y, z });
+      this._addMarkerMesh({
+        entity_id, room, label, color, x, y, z,
+        threshold_below: thresholdBelow,
+        threshold_color: thresholdColor,
+      });
       this._updateMarkerColors();
       this._closeMarkerEditor();
     } catch (err) {
