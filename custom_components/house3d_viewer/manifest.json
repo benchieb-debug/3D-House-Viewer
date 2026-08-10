@@ -2,9 +2,9 @@
   "domain": "house3d_viewer",
   "name": "Haus 3D Viewer",
   "version": "0.1.0",
-  "documentation": "https://github.com/benchieb/house3d-viewer",
-  "issue_tracker": "https://github.com/benchieb/house3d-viewer/issues",
-  "codeowners": ["@benchieb"],
+  "documentation": "https://github.com/benchieb-debug/3D-Haus-Viewer",
+  "issue_tracker": "https://github.com/benchieb-debug/3D-Haus-Viewer/issues",
+  "codeowners": ["@benchieb-debug"],
   "requirements": [],
   "config_flow": false,
   "iot_class": "local_push"
