@@ -1,4 +1,4 @@
-# Haus 3D Viewer
+# 3D House Viewer
 
 Home-Assistant-Custom-Integration mit eigenem Sidebar-Panel, das dein
 gescanntes Haus als 3D-Modell (STL) anzeigt und Sensoren/Aktoren als
@@ -25,7 +25,7 @@ bereitgestellt (App Store).
 
 1. HACS → Integrationen → ⋮ → *Benutzerdefinierte Repositories*
 2. Repository-URL dieses Projekts eintragen, Kategorie *Integration*
-3. "Haus 3D Viewer" installieren
+3. "3D House Viewer" installieren
 4. Home Assistant neu starten
 
 ### Manuell
