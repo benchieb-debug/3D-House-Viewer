@@ -2,13 +2,15 @@
 
 [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=benchieb-debug&repository=3D-House-Viewer&category=integration)
 
-🇩🇪 [Deutsche Anleitung weiter unten](#deutsch)
+📖 **Illustrated installation guide:** [English](docs/INSTALLATION.md) · [Deutsch](docs/INSTALLATION.de.md)
+
+🇩🇪 [Deutsche Kurzanleitung weiter unten](#deutsch)
 
 A Home Assistant custom integration with its own sidebar panel that shows your
 scanned house as a 3D model (STL) and places your sensors and actuators as
 clickable, color-coded markers inside it.
 
-![Panel view with axes and marker dialog](docs/screenshot-marker-dialog.png)
+![The panel showing a 3D model of a home with colored sensor markers](docs/images/en/overview.png)
 
 - Semi-transparent house mesh with edge lines (deliberately not photorealistic)
 - Multiple floors with a floor switcher in the panel — at least one floor is
@@ -23,9 +25,11 @@ clickable, color-coded markers inside it.
 
 - Home Assistant 2024.7.0 or newer
 - An **STL** file of your house and a **positions JSON** file for each floor
-  (format described below). Compatible STL exports are currently provided by the
-  **Scan 3D** iOS app (App Store), but any STL works as long as the marker
-  coordinates are in the same coordinate space as the model.
+  (format described below).
+- The integration is built to work with the **Scan 3D** iOS app (App Store): a
+  RoomPlan scan with the **HA** option creates the matching files, see the
+  [installation guide](docs/INSTALLATION.md#step-2--get-your-scan-files). Any other
+  STL plus a positions JSON in the format below works as well.
 
 ## Installation
 
@@ -99,7 +103,7 @@ assumptions about where the data comes from:
 
 ```json
 {
-  "coordinate_system": "right-handed, meters, origin = scan start point",
+  "coordinate_system": "arkit_meters_y_up",
   "markers": [
     {
       "entity_id": "binary_sensor.living_room_window",
@@ -118,8 +122,9 @@ assumptions about where the data comes from:
 
 | Field | Required | Description |
 |---|---|---|
+| `coordinate_system` (top level) | no | Informational only, not evaluated. The Scan 3D app writes `arkit_meters_y_up` |
 | `entity_id` | yes | The Home Assistant entity whose state drives the marker color |
-| `x`, `y`, `z` | yes | Position in meters. In this file `y` is the **vertical** axis (height) |
+| `x`, `y`, `z` | yes | Position in meters, measured from the **center of the STL model's bounding box** (the panel centers the model). In this file `y` is the **vertical** axis (height) |
 | `room` | no | Free text, informational only |
 | `label` | no | Free display text |
 | `color` | no | Fixed hex color. If set, it always wins over the entity state |
@@ -172,6 +177,8 @@ only expects a finished STL + JSON pair.
 Home-Assistant-Custom-Integration mit eigenem Sidebar-Panel, das dein
 gescanntes Haus als 3D-Modell (STL) anzeigt und Sensoren/Aktoren als
 klickbare, farbcodierte Marker im Raum darstellt.
+
+📖 **Bebilderte Schritt-für-Schritt-Anleitung:** [Deutsch](docs/INSTALLATION.de.md) · [English](docs/INSTALLATION.md)
 
 - Halbtransparentes Haus-Mesh mit Kantenlinien (bewusst kein Foto-Realismus)
 - Mehrere Ebenen ("Etagen") mit Umschalter im Panel — mindestens eine Ebene
@@ -255,7 +262,7 @@ sie trifft keine Annahmen über die Herkunft der Daten:
 
 ```json
 {
-  "coordinate_system": "right-handed, meters, origin = scan start point",
+  "coordinate_system": "arkit_meters_y_up",
   "markers": [
     {
       "entity_id": "binary_sensor.tuer_wohnzimmer",
@@ -271,7 +278,9 @@ sie trifft keine Annahmen über die Herkunft der Daten:
 
 - `entity_id`: die Home-Assistant-Entity, deren State die Marker-Farbe bestimmt
 - `room`: freier Text, aktuell nur informativ
-- `x`, `y`, `z`: Position in Metern, `y` = Höhe
+- `x`, `y`, `z`: Position in Metern, gemessen von der Mitte der Begrenzungsbox des
+  STL-Modells (das Panel zentriert das Modell), `y` = Höhe
+- `coordinate_system` (oberste Ebene): rein informativ, wird nicht ausgewertet
 - `label`: Anzeigetext
 - Optional pro Marker: `color` (feste Farbe, hat Vorrang vor dem Entity-State)
   sowie `threshold_below` + `threshold_color` (z. B. Batterie < 10 % → Rot).
