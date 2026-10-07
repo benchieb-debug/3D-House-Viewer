@@ -1,4 +1,4 @@
-"""Constants for the Haus 3D Viewer integration."""
+"""Constants for the 3D House Viewer integration."""
 
 DOMAIN = "house3d_viewer"
 
@@ -18,7 +18,10 @@ DEFAULT_STATE_COLORS = {
     "unknown": "#9e9e9e",
 }
 
-PANEL_TITLE = "Haus 3D"
+# Sidebar title. English by default; instances whose Home Assistant language is German
+# keep the German title (see panel.py).
+PANEL_TITLE = "3D House"
+PANEL_TITLE_DE = "Haus 3D"
 PANEL_ICON = "mdi:cube-scan"
 PANEL_URL_PATH = "house3d-viewer"
 WEBCOMPONENT_NAME = "house3d-viewer-panel"

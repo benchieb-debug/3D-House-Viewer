@@ -82,7 +82,8 @@ Notes:
   Assistant. With two or more floors a floor switcher appears at the top right
   of the panel; with a single floor it is hidden.
 - After changing the YAML, restart Home Assistant. The sidebar entry
-  **"Haus 3D"** appears afterwards.
+  **"3D House"** appears afterwards (**"Haus 3D"** if your Home Assistant
+  language is set to German).
 
 ### Getting your scan files onto Home Assistant
 
@@ -137,7 +138,7 @@ Color resolution order: fixed `color` → threshold rule (only for numeric state
 Markers can be created, moved, recolored and deleted directly in the panel, no
 file editing needed:
 
-1. Open the panel and click **"✎ Bearbeiten"** (edit mode). Editing is only
+1. Open the panel and click **"✎ Edit"** (edit mode). Editing is only
    possible while edit mode is active, to prevent accidental changes.
 2. Add a marker or click an existing one. In the dialog you can set the
    position, an optional fixed color and an optional "warning color below value"
@@ -145,8 +146,10 @@ file editing needed:
 3. Changes are written straight back into the floor's positions JSON file, so
    the file must be writable by Home Assistant.
 
-> The panel's own labels (sidebar entry "Haus 3D", "✎ Bearbeiten", "Achsen", …)
-> are currently in German. Translating the panel UI is planned.
+> The panel UI is available in **English and German** and follows your Home
+> Assistant user language; any other language falls back to English. More
+> languages are easy to add: see the `STRINGS` table at the top of
+> `custom_components/house3d_viewer/www/house3d-panel.js`.
 
 ## Trying it with sample data
 
@@ -233,7 +236,9 @@ automatisch ein Umschalter oben rechts im Panel; bei nur einer Ebene wird er
 ausgeblendet.
 
 Nach dem Ändern der YAML-Konfiguration Home Assistant neu starten. Der
-Reiter **"Haus 3D"** erscheint danach in der Sidebar.
+Reiter **"Haus 3D"** erscheint danach in der Sidebar (bei anderer
+Home-Assistant-Sprache heißt er **"3D House"**). Die Panel-Oberfläche folgt
+deiner Home-Assistant-Sprache (Deutsch oder Englisch).
 
 ### Scan-Dateien einspielen
 

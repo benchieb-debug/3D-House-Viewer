@@ -1,11 +1,11 @@
-// Haus 3D Viewer - custom Home Assistant sidebar panel.
+// 3D House Viewer - custom Home Assistant sidebar panel.
 //
 // Renders the configured STL floor models with translucent walls + edge
 // outlines, and places colored markers for each entity from the positions
 // JSON. Marker color follows the live entity state (configurable mapping,
 // see const.py DEFAULT_STATE_COLORS / the "state_colors" YAML option).
 // Clicking a marker opens Home Assistant's native more-info dialog.
-// A floor switcher lets the user pick between the configured "Ebenen".
+// A floor switcher lets the user pick between the configured floors.
 
 // unpkg serves three.js's examples/jsm modules with a bare "three" import
 // internally, which the browser can't resolve without an import map. esm.sh
@@ -15,6 +15,73 @@ import { STLLoader } from "https://esm.sh/three@0.160.0/examples/jsm/loaders/STL
 import { OrbitControls } from "https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js";
 
 const FALLBACK_COLOR = "#9e9e9e";
+
+// UI texts. The language follows the Home Assistant user profile (hass.locale.language);
+// anything without a translation falls back to English. To add a language, add one more
+// object here with the same keys.
+const STRINGS = {
+  en: {
+    loadingFloors: "Loading floors…",
+    editToggle: "✎ Edit",
+    axes: "Axes",
+    addPoint: "+ Point",
+    entity: "Entity",
+    entityPlaceholder: "light.living_room",
+    room: "Room",
+    name: "Name",
+    color: "Color",
+    thresholdLabel: "Warning color when value below",
+    delete: "Delete",
+    cancel: "Cancel",
+    save: "Save",
+    newPoint: "New point",
+    placeHint: "Tap the model to place a point",
+    errNoApiBase: "Panel configuration missing (api_base).",
+    errNoFloors: "No floors configured.",
+    errLoadFloors: "Failed to load floors. See console.",
+    loadingModel: "Loading house model…",
+    errLoadHouse: "Failed to load house data. See console.",
+    errLoadModel: "House model could not be loaded. See console.",
+    errSave: "Saving failed. See console.",
+    errCreate: "Creating failed. See console.",
+    errDelete: "Deleting failed. See console.",
+  },
+  de: {
+    loadingFloors: "Lade Ebenen…",
+    editToggle: "✎ Bearbeiten",
+    axes: "Achsen",
+    addPoint: "+ Punkt",
+    entity: "Entity",
+    entityPlaceholder: "light.wohnzimmer",
+    room: "Raum",
+    name: "Name",
+    color: "Farbe",
+    thresholdLabel: "Warnfarbe wenn Wert unter",
+    delete: "Löschen",
+    cancel: "Abbrechen",
+    save: "Speichern",
+    newPoint: "Neuer Punkt",
+    placeHint: "Tippe auf das Modell, um einen Punkt zu setzen",
+    errNoApiBase: "Panel-Konfiguration fehlt (api_base).",
+    errNoFloors: "Keine Ebenen konfiguriert.",
+    errLoadFloors: "Fehler beim Laden der Ebenen. Siehe Konsole.",
+    loadingModel: "Lade Hausmodell…",
+    errLoadHouse: "Fehler beim Laden der Haus-Daten. Siehe Konsole.",
+    errLoadModel: "Hausmodell konnte nicht geladen werden. Siehe Konsole.",
+    errSave: "Speichern fehlgeschlagen. Siehe Konsole.",
+    errCreate: "Erstellen fehlgeschlagen. Siehe Konsole.",
+    errDelete: "Löschen fehlgeschlagen. Siehe Konsole.",
+  },
+};
+
+function resolveLanguage(hass) {
+  const raw =
+    (hass && ((hass.locale && hass.locale.language) || hass.language)) ||
+    navigator.language ||
+    "en";
+  const base = String(raw).toLowerCase().split("-")[0];
+  return STRINGS[base] ? base : "en";
+}
 
 class House3DViewerPanel extends HTMLElement {
   constructor() {
@@ -43,8 +110,33 @@ class House3DViewerPanel extends HTMLElement {
     const previous = this._hass;
     this._hass = hass;
     if (this._initialized) {
+      this._applyLanguage();
       this._updateMarkerColors(previous);
     }
+  }
+
+  _t(key) {
+    const table = STRINGS[resolveLanguage(this._hass)];
+    return table[key] !== undefined ? table[key] : STRINGS.en[key];
+  }
+
+  // Sets all static labels in the current language. Cheap no-op while the language is unchanged,
+  // so it can run on every hass update (the language can change while the panel is open).
+  _applyLanguage() {
+    const language = resolveLanguage(this._hass);
+    if (!this._markerEditEl || language === this._appliedLanguage) {
+      return;
+    }
+    this._appliedLanguage = language;
+    this._editToggleEl.textContent = this._t("editToggle");
+    this._axesToggleEl.textContent = this._t("axes");
+    this._addMarkerToggleEl.textContent = this._t("addPoint");
+    this.shadowRoot.querySelectorAll("[data-i18n]").forEach((el) => {
+      el.textContent = this._t(el.dataset.i18n);
+    });
+    this.shadowRoot.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+      el.placeholder = this._t(el.dataset.i18nPlaceholder);
+    });
   }
 
   get hass() {
@@ -114,21 +206,21 @@ class House3DViewerPanel extends HTMLElement {
 
     const status = document.createElement("div");
     status.id = "status";
-    status.textContent = "Lade Ebenen…";
+    status.textContent = this._t("loadingFloors");
 
     const editToggle = document.createElement("button");
     editToggle.className = "floor-btn";
-    editToggle.textContent = "✎ Bearbeiten";
+    editToggle.textContent = this._t("editToggle");
     editToggle.addEventListener("click", () => this._toggleEditMode());
 
     const axesToggle = document.createElement("button");
     axesToggle.className = "floor-btn";
-    axesToggle.textContent = "Achsen";
+    axesToggle.textContent = this._t("axes");
     axesToggle.addEventListener("click", () => this._toggleAxes());
 
     const addMarkerToggle = document.createElement("button");
     addMarkerToggle.className = "floor-btn";
-    addMarkerToggle.textContent = "+ Punkt";
+    addMarkerToggle.textContent = this._t("addPoint");
     addMarkerToggle.style.display = "none"; // nur sichtbar im Bearbeiten-Modus
     addMarkerToggle.addEventListener("click", () => this._togglePlacingMode());
 
@@ -144,28 +236,28 @@ class House3DViewerPanel extends HTMLElement {
     markerEdit.id = "markerEdit";
     markerEdit.innerHTML = `
       <div class="me-title"></div>
-      <div class="me-row me-text me-entity"><label>Entity</label><input type="text" class="me-entity-id" placeholder="light.wohnzimmer" autocapitalize="off" autocorrect="off"></div>
-      <div class="me-row me-text me-room-row"><label>Raum</label><input type="text" class="me-room"></div>
-      <div class="me-row me-text me-label-row"><label>Name</label><input type="text" class="me-label"></div>
+      <div class="me-row me-text me-entity"><label data-i18n="entity"></label><input type="text" class="me-entity-id" data-i18n-placeholder="entityPlaceholder" autocapitalize="off" autocorrect="off"></div>
+      <div class="me-row me-text me-room-row"><label data-i18n="room"></label><input type="text" class="me-room"></div>
+      <div class="me-row me-text me-label-row"><label data-i18n="name"></label><input type="text" class="me-label"></div>
       <div class="me-row"><label>X</label><input type="number" step="0.01" class="me-x"></div>
       <div class="me-row"><label>Y</label><input type="number" step="0.01" class="me-y"></div>
       <div class="me-row"><label>Z</label><input type="number" step="0.01" class="me-z"></div>
       <div class="me-row me-text">
-        <label><input type="checkbox" class="me-color-enabled"> Farbe</label>
+        <label><input type="checkbox" class="me-color-enabled"> <span data-i18n="color"></span></label>
         <input type="color" class="me-color" value="#9e9e9e" disabled>
       </div>
       <div class="me-row me-text">
-        <label><input type="checkbox" class="me-threshold-enabled"> Warnfarbe wenn Wert unter</label>
+        <label><input type="checkbox" class="me-threshold-enabled"> <span data-i18n="thresholdLabel"></span></label>
       </div>
       <div class="me-row me-threshold-inputs">
         <input type="number" step="0.1" class="me-threshold-value" placeholder="10" disabled>
         <input type="color" class="me-threshold-color" value="#ff3b30" disabled>
       </div>
       <div class="me-actions">
-        <button type="button" class="me-delete">Löschen</button>
+        <button type="button" class="me-delete" data-i18n="delete"></button>
         <span style="flex:1"></span>
-        <button type="button" class="me-cancel">Abbrechen</button>
-        <button type="button" class="me-save">Speichern</button>
+        <button type="button" class="me-cancel" data-i18n="cancel"></button>
+        <button type="button" class="me-save" data-i18n="save"></button>
       </div>
     `;
     markerEdit.querySelector(".me-cancel").addEventListener("click", () => this._closeMarkerEditor());
@@ -210,6 +302,8 @@ class House3DViewerPanel extends HTMLElement {
     this._markerEditThresholdValueEl = markerEdit.querySelector(".me-threshold-value");
     this._markerEditThresholdColorEl = markerEdit.querySelector(".me-threshold-color");
     this._editingMarkerIndex = null;
+    this._appliedLanguage = null;
+    this._applyLanguage();
   }
 
   _setStatus(text) {
@@ -292,7 +386,7 @@ class House3DViewerPanel extends HTMLElement {
   async _loadFloors() {
     const apiBase = this._panelConfig.api_base;
     if (!apiBase) {
-      this._setStatus("Panel-Konfiguration fehlt (api_base).");
+      this._setStatus(this._t("errNoApiBase"));
       return;
     }
     try {
@@ -302,13 +396,13 @@ class House3DViewerPanel extends HTMLElement {
       }
       this._floors = await resp.json();
       if (!this._floors.length) {
-        this._setStatus("Keine Ebenen konfiguriert.");
+        this._setStatus(this._t("errNoFloors"));
         return;
       }
       this._selectFloor(this._floors[0].id);
     } catch (err) {
-      console.error("[house3d-viewer] Konnte Ebenen nicht laden:", err);
-      this._setStatus("Fehler beim Laden der Ebenen. Siehe Konsole.");
+      console.error("[house3d-viewer] Could not load floors:", err);
+      this._setStatus(this._t("errLoadFloors"));
     }
   }
 
@@ -364,7 +458,7 @@ class House3DViewerPanel extends HTMLElement {
   _togglePlacingMode() {
     this._placingMode = !this._placingMode;
     this._addMarkerToggleEl.classList.toggle("active", this._placingMode);
-    this._setStatus(this._placingMode ? "Tippe auf das Modell, um einen Punkt zu setzen" : null);
+    this._setStatus(this._placingMode ? this._t("placeHint") : null);
   }
 
   // Stift-Button: schaltet frei, ob Punkte erzeugt/bearbeitet/gelöscht werden können. Im
@@ -430,7 +524,7 @@ class House3DViewerPanel extends HTMLElement {
   async _loadFloorData(floorId) {
     const apiBase = this._panelConfig.api_base;
     const token = ++this._loadToken;
-    this._setStatus("Lade Hausmodell…");
+    this._setStatus(this._t("loadingModel"));
     this._clearScene();
 
     try {
@@ -448,8 +542,8 @@ class House3DViewerPanel extends HTMLElement {
       this._loadModel(`${apiBase}/floors/${floorId}/model`, token);
       this._buildMarkers(positions.markers || []);
     } catch (err) {
-      console.error("[house3d-viewer] Konnte Daten nicht laden:", err);
-      this._setStatus("Fehler beim Laden der Haus-Daten. Siehe Konsole.");
+      console.error("[house3d-viewer] Could not load data:", err);
+      this._setStatus(this._t("errLoadHouse"));
     }
   }
 
@@ -506,8 +600,8 @@ class House3DViewerPanel extends HTMLElement {
         if (token !== this._loadToken) {
           return;
         }
-        console.error("[house3d-viewer] STL-Ladefehler:", err);
-        this._setStatus("Hausmodell konnte nicht geladen werden. Siehe Konsole.");
+        console.error("[house3d-viewer] STL load error:", err);
+        this._setStatus(this._t("errLoadModel"));
       }
     );
   }
@@ -682,7 +776,7 @@ class House3DViewerPanel extends HTMLElement {
     this._creatingAtPoint = point;
     this._setEntityRowsVisible(true);
     this._markerEditDeleteEl.style.display = "none"; // beim Neuanlegen gibt es noch nichts zu löschen
-    this._markerEditTitleEl.textContent = "Neuer Punkt";
+    this._markerEditTitleEl.textContent = this._t("newPoint");
     this._markerEditEntityEl.value = "";
     this._markerEditRoomEl.value = "";
     this._markerEditLabelEl.value = "";
@@ -790,8 +884,8 @@ class House3DViewerPanel extends HTMLElement {
       }
       this._closeMarkerEditor();
     } catch (err) {
-      console.error("[house3d-viewer] Marker-Update fehlgeschlagen:", err);
-      this._flashError("Speichern fehlgeschlagen. Siehe Konsole.");
+      console.error("[house3d-viewer] Marker update failed:", err);
+      this._flashError(this._t("errSave"));
     }
   }
 
@@ -821,8 +915,8 @@ class House3DViewerPanel extends HTMLElement {
       this._updateMarkerColors();
       this._closeMarkerEditor();
     } catch (err) {
-      console.error("[house3d-viewer] Marker-Erstellung fehlgeschlagen:", err);
-      this._flashError("Erstellen fehlgeschlagen. Siehe Konsole.");
+      console.error("[house3d-viewer] Marker creation failed:", err);
+      this._flashError(this._t("errCreate"));
     }
   }
 
@@ -852,8 +946,8 @@ class House3DViewerPanel extends HTMLElement {
       this._markers.splice(index, 1);
       this._closeMarkerEditor();
     } catch (err) {
-      console.error("[house3d-viewer] Marker-Löschung fehlgeschlagen:", err);
-      this._flashError("Löschen fehlgeschlagen. Siehe Konsole.");
+      console.error("[house3d-viewer] Marker deletion failed:", err);
+      this._flashError(this._t("errDelete"));
     }
   }
 

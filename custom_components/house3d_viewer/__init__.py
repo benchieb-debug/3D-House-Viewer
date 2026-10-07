@@ -1,4 +1,4 @@
-"""Haus 3D Viewer: shows scanned STL floor models with live entity markers."""
+"""3D House Viewer: shows scanned STL floor models with live entity markers."""
 from __future__ import annotations
 
 import json
@@ -392,7 +392,7 @@ class House3DMarkerCreateView(HomeAssistantView):
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the Haus 3D Viewer integration from YAML."""
+    """Set up the 3D House Viewer integration from YAML."""
     conf = config[DOMAIN]
     floors = _build_floor_registry(conf[CONF_FLOORS])
     hass.data[DOMAIN] = {"floors": floors, CONF_STATE_COLORS: conf[CONF_STATE_COLORS]}
@@ -410,7 +410,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
     await async_register_panel(hass)
 
-    _LOGGER.debug("Haus 3D Viewer set up with floors: %s", list(floors))
+    _LOGGER.debug("3D House Viewer set up with floors: %s", list(floors))
     return True
 
 
