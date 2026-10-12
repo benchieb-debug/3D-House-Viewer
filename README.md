@@ -304,18 +304,6 @@ voraus.
 
 ---
 
-## Support / Unterstützen
-
-If this integration is useful to you, a donation is much appreciated.
-Wenn dir die Integration was wert ist, freue ich mich über eine Spende:
-
-| | Address / Adresse |
-|---|---|
-| ₿ Bitcoin (Taproot) | `bc1pxt3hfsqua095qe2xprhqt2d2wc9h88w0w75jrc4hzckdpwml8j8svzpqtz` |
-| Ξ Ethereum | `0x457c5EB013635dA90365Dd80D8139737701719a4` |
-| BNB Smart Chain (BEP20) | `0x457c5EB013635dA90365Dd80D8139737701719a4` |
-| Solana | `64czaeXhwxtG3K3BrX1w7scZWDbdZaKTxvDHVDv9qPQC` |
-
 ## License / Lizenz
 
 MIT, see / siehe [LICENSE](LICENSE).
